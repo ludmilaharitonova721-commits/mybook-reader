@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
@@ -40,53 +40,15 @@ export const TextToSpeechControls = ({
   const [isFloating, setIsFloating] = useState(true);
   const { language } = useLanguage();
   
-  const {
-    isSupported,
-    state,
-    settings,
-    availableVoices,
-    progress,
-    speak,
-    pause,
-    resume,
-    stop,
-    updateSettings,
-    getVoicesForLanguage
-  } = useTextToSpeech({
+  const tts = useTextToSpeech({
     onWordBoundary: (charIndex, word) => {
       onWordHighlight?.(word, charIndex);
     }
   });
 
-  const languageVoices = getVoicesForLanguage(language === 'ru' ? 'ru-RU' : 'en-US');
+  const languageVoices = tts.getVoicesForLanguage(language === 'ru' ? 'ru-RU' : 'en-US');
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        switch (e.key) {
-          case ' ':
-            e.preventDefault();
-            if (state.speaking && !state.paused) {
-              pause();
-            } else if (state.paused) {
-              resume();
-            } else {
-              speak(text);
-            }
-            break;
-          case 'Escape':
-            stop();
-            break;
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [state.speaking, state.paused, text, speak, pause, resume, stop]);
-
-  if (!isSupported) {
+  if (!tts.isSupported) {
     return (
       <div className="text-center p-4 text-muted-foreground">
         Синтез речи не поддерживается в этом браузере.
@@ -95,18 +57,18 @@ export const TextToSpeechControls = ({
   }
 
   const handlePlayPause = () => {
-    if (state.speaking && !state.paused) {
-      pause();
-    } else if (state.paused) {
-      resume();
+    if (tts.state.speaking && !tts.state.paused) {
+      tts.pause();
+    } else if (tts.state.paused) {
+      tts.resume();
     } else {
-      speak(text);
+      tts.speak(text);
     }
   };
 
   const getSpeechState = () => {
-    if (state.speaking && !state.paused) return 'speaking';
-    if (state.paused) return 'paused';
+    if (tts.state.speaking && !tts.state.paused) return 'speaking';
+    if (tts.state.paused) return 'paused';
     return 'stopped';
   };
 
@@ -118,12 +80,12 @@ export const TextToSpeechControls = ({
       <div className={cn("fixed bottom-6 right-6 z-50", className)}>
         <div className="flex flex-col items-end space-y-2">
           {/* Progress indicator */}
-          {progress.progress > 0 && (
+          {tts.progress.progress > 0 && (
             <div className="bg-background/90 backdrop-blur-sm rounded-full p-2 shadow-lg border">
               <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-primary transition-all duration-300"
-                  style={{ width: `${progress.progress}%` }}
+                  style={{ width: `${tts.progress.progress}%` }}
                 />
               </div>
             </div>
@@ -210,7 +172,7 @@ export const TextToSpeechControls = ({
             size="sm"
             variant="outline"
             onClick={() => {
-              stop();
+              tts.stop();
             }}
           >
             <SkipBack className="h-4 w-4" />
@@ -219,7 +181,7 @@ export const TextToSpeechControls = ({
           <Button
             size="sm"
             variant="outline"
-            onClick={stop}
+            onClick={tts.stop}
           >
             <Square className="h-4 w-4" />
           </Button>
@@ -243,8 +205,8 @@ export const TextToSpeechControls = ({
             size="sm"
             variant="outline"
             onClick={() => {
-              stop();
-              speak(text);
+              tts.stop();
+              tts.speak(text);
             }}
           >
             <RotateCcw className="h-4 w-4" />
@@ -262,12 +224,12 @@ export const TextToSpeechControls = ({
         </div>
 
         {/* Progress bar */}
-        {progress.progress > 0 && (
+        {tts.progress.progress > 0 && (
           <div className="space-y-2">
-            <Progress value={progress.progress} className="h-2" />
+            <Progress value={tts.progress.progress} className="h-2" />
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{Math.round(progress.progress)}%</span>
-              <span>Время: {progress.elapsedTime}с</span>
+              <span>{Math.round(tts.progress.progress)}%</span>
+              <span>Время: {tts.progress.elapsedTime}с</span>
             </div>
           </div>
         )}
@@ -276,11 +238,11 @@ export const TextToSpeechControls = ({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium">Скорость</label>
-            <span className="text-sm text-muted-foreground">{settings.rate}x</span>
+            <span className="text-sm text-muted-foreground">{tts.settings.rate}x</span>
           </div>
           <Slider
-            value={[settings.rate]}
-            onValueChange={(values) => updateSettings({ rate: values[0] })}
+            value={[tts.settings.rate]}
+            onValueChange={(values) => tts.updateSettings({ rate: values[0] })}
             min={0.5}
             max={2}
             step={0.1}
@@ -295,11 +257,11 @@ export const TextToSpeechControls = ({
               <Volume2 className="h-4 w-4" />
               <span>Громкость</span>
             </label>
-            <span className="text-sm text-muted-foreground">{Math.round(settings.volume * 100)}%</span>
+            <span className="text-sm text-muted-foreground">{Math.round(tts.settings.volume * 100)}%</span>
           </div>
           <Slider
-            value={[settings.volume]}
-            onValueChange={(values) => updateSettings({ volume: values[0] })}
+            value={[tts.settings.volume]}
+            onValueChange={(values) => tts.updateSettings({ volume: values[0] })}
             min={0}
             max={1}
             step={0.1}
@@ -314,8 +276,8 @@ export const TextToSpeechControls = ({
             <span>Голос ({language})</span>
           </label>
           <Select 
-            value={settings.voice || ''} 
-            onValueChange={(value) => updateSettings({ voice: value })}
+            value={tts.settings.voice || ''} 
+            onValueChange={(value) => tts.updateSettings({ voice: value })}
           >
             <SelectTrigger>
               <SelectValue placeholder="Выберите голос" />
@@ -342,11 +304,11 @@ export const TextToSpeechControls = ({
         </div>
 
         {/* Current word indicator */}
-        {state.speaking && progress.currentWordIndex >= 0 && (
+        {tts.state.speaking && tts.progress.currentWordIndex >= 0 && (
           <div className="text-center p-2 bg-muted rounded-md">
             <p className="text-xs text-muted-foreground mb-1">Читается:</p>
             <p className="font-medium text-primary">
-              {text.split(' ')[progress.currentWordIndex] || '...'}
+              {text.split(' ')[tts.progress.currentWordIndex] || '...'}
             </p>
           </div>
         )}

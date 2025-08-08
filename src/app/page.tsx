@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import React, { useState, useEffect } from 'react'
 import SidebarNavigation from '@/components/app/sidebar-navigation'
@@ -7,7 +7,7 @@ import ReadingInterface from '@/components/app/reading-interface'
 import SearchInterface from '@/components/app/search-interface'
 import CollectionsManager from '@/components/app/collections-manager'
 import { BookAddDialog } from '@/components/app/book-add-dialog'
-import { useTextToSpeech } from '@/lib/hooks/useSpeechSynthesis'
+import { useTextToSpeech } from '@/hooks/use-text-to-speech'
 
 interface BookData {
   id: string
@@ -105,11 +105,9 @@ export default function HomePage() {
 
   // Инициализация text-to-speech
   const tts = useTextToSpeech({
-    language: voiceSettings.language,
-    voiceURI: voiceSettings.voice !== 'default' ? voiceSettings.voice : undefined,
-    rate: voiceSettings.speed,
-    pitch: voiceSettings.pitch,
-    volume: voiceSettings.volume
+    onError: (error) => console.error('TTS Error:', error),
+    onStart: () => console.log('TTS Started'),
+    onEnd: () => console.log('TTS Ended')
   })
 
   // Available collections for book assignment
@@ -139,11 +137,11 @@ export default function HomePage() {
 
   // Получение голосов для выбранного языка
   const getAvailableVoices = () => {
-    const languageVoices = tts.getVoicesByLanguage(voiceSettings.language)
+    const languageVoices = tts.getVoicesForLanguage(voiceSettings.language)
     return [
       { id: 'default', name: 'Системный голос по умолчанию' },
       ...languageVoices.map(voice => ({
-        id: voice.voiceURI,
+        id: voice.voice.name,
         name: voice.name
       }))
     ]
@@ -164,17 +162,6 @@ export default function HomePage() {
     }
   }, [])
 
-  // Обновление TTS настроек при изменении voiceSettings
-  useEffect(() => {
-    tts.updateSettings({
-      language: voiceSettings.language,
-      voiceURI: voiceSettings.voice !== 'default' ? voiceSettings.voice : undefined,
-      rate: voiceSettings.speed,
-      pitch: voiceSettings.pitch,
-      volume: voiceSettings.volume
-    })
-  }, [voiceSettings, tts])
-
   const handleThemeToggle = () => {
     setIsDarkMode(!isDarkMode)
     if (!isDarkMode) {
@@ -191,6 +178,14 @@ export default function HomePage() {
     const updatedSettings = { ...voiceSettings, ...newSettings }
     setVoiceSettings(updatedSettings)
     localStorage.setItem('voiceSettings', JSON.stringify(updatedSettings))
+    
+    // Update TTS settings
+    tts.updateSettings({
+      rate: updatedSettings.speed,
+      pitch: updatedSettings.pitch,
+      volume: updatedSettings.volume,
+      voice: updatedSettings.voice !== 'default' ? updatedSettings.voice : null
+    })
   }
 
   // Обработчик тестирования голоса
@@ -210,7 +205,7 @@ export default function HomePage() {
     }
 
     const testText = testTexts[voiceSettings.language as keyof typeof testTexts] || testTexts['en-US']
-    tts.testVoice(testText)
+    tts.speak(testText, voiceSettings.language)
   }
 
   // Navigation handling
@@ -391,265 +386,6 @@ export default function HomePage() {
               }))}
               onBookClick={(book) => handleBookRead(book.id)}
             />
-          </div>
-        )
-
-      case 'settings':
-        return (
-          <div className="flex-1 p-8">
-            <div className="max-w-2xl">
-              <h1 className="text-3xl font-display font-bold text-foreground mb-2">
-                Настройки
-              </h1>
-              <p className="text-muted-foreground mb-8">
-                Персонализируйте ваш опыт чтения
-              </p>
-              
-              <div className="space-y-8">
-                {/* Внешний вид */}
-                <div className="bg-card p-6 rounded-lg border">
-                  <h2 className="text-xl font-display font-semibold mb-4">Внешний вид</h2>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-sm font-medium">Темная тема</label>
-                        <p className="text-xs text-muted-foreground">
-                          Переключение между светлой и темной темой
-                        </p>
-                      </div>
-                      <button
-                        onClick={handleThemeToggle}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          isDarkMode ? 'bg-primary' : 'bg-muted'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
-                            isDarkMode ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Чтение */}
-                <div className="bg-card p-6 rounded-lg border">
-                  <h2 className="text-xl font-display font-semibold mb-4">Чтение</h2>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Размер шрифта по умолчанию
-                      </label>
-                      <select className="w-full p-2 border border-border rounded-md bg-input">
-                        <option>16px (Маленький)</option>
-                        <option selected>18px (Средний)</option>
-                        <option>20px (Большой)</option>
-                        <option>22px (Очень большой)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Шрифт по умолчанию
-                      </label>
-                      <select className="w-full p-2 border border-border rounded-md bg-input">
-                        <option selected>Georgia (Serif)</option>
-                        <option>Inter (Sans-serif)</option>
-                        <option>System Font</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Озвучивание книг */}
-                <div className="bg-card p-6 rounded-lg border">
-                  <h2 className="text-xl font-display font-semibold mb-4 flex items-center gap-2">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 14.142M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                    </svg>
-                    Озвучивание книг
-                  </h2>
-                  
-                  {!tts.state.isSupported && (
-                    <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
-                      <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                        ⚠️ Озвучивание не поддерживается в вашем браузере
-                      </p>
-                    </div>
-                  )}
-                  
-                  {tts.state.error && (
-                    <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                      <p className="text-sm text-red-800 dark:text-red-200">
-                        {tts.state.error}
-                      </p>
-                    </div>
-                  )}
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-sm font-medium">Включить озвучивание</label>
-                        <p className="text-xs text-muted-foreground">
-                          Автоматическое чтение текста вслух
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleVoiceSettingsChange({ enabled: !voiceSettings.enabled })}
-                        disabled={!tts.state.isSupported}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          voiceSettings.enabled && tts.state.isSupported ? 'bg-primary' : 'bg-muted'
-                        } ${!tts.state.isSupported ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
-                            voiceSettings.enabled && tts.state.isSupported ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-
-                    {voiceSettings.enabled && tts.state.isSupported && (
-                      <>
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">
-                            Язык озвучивания
-                          </label>
-                          <select 
-                            value={voiceSettings.language}
-                            onChange={(e) => handleVoiceSettingsChange({ language: e.target.value, voice: 'default' })}
-                            className="w-full p-2 border border-border rounded-md bg-input"
-                          >
-                            {availableLanguages.map(lang => (
-                              <option key={lang.code} value={lang.code}>{lang.name}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">
-                            Голос
-                          </label>
-                          <select 
-                            value={voiceSettings.voice}
-                            onChange={(e) => handleVoiceSettingsChange({ voice: e.target.value })}
-                            className="w-full p-2 border border-border rounded-md bg-input"
-                            disabled={tts.state.isLoading}
-                          >
-                            {getAvailableVoices().map(voice => (
-                              <option key={voice.id} value={voice.id}>{voice.name}</option>
-                            ))}
-                          </select>
-                          {tts.state.isLoading && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Загружаются доступные голоса...
-                            </p>
-                          )}
-                        </div>
-
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">
-                            Скорость речи: {voiceSettings.speed}x
-                          </label>
-                          <input
-                            type="range"
-                            min="0.5"
-                            max="2.0"
-                            step="0.1"
-                            value={voiceSettings.speed}
-                            onChange={(e) => handleVoiceSettingsChange({ speed: parseFloat(e.target.value) })}
-                            className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer slider"
-                          />
-                          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                            <span>Медленно</span>
-                            <span>Нормально</span>
-                            <span>Быстро</span>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">
-                            Тон голоса: {voiceSettings.pitch}
-                          </label>
-                          <input
-                            type="range"
-                            min="0.5"
-                            max="1.5"
-                            step="0.1"
-                            value={voiceSettings.pitch}
-                            onChange={(e) => handleVoiceSettingsChange({ pitch: parseFloat(e.target.value) })}
-                            className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer slider"
-                          />
-                          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                            <span>Низкий</span>
-                            <span>Обычный</span>
-                            <span>Высокий</span>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">
-                            Громкость: {Math.round(voiceSettings.volume * 100)}%
-                          </label>
-                          <input
-                            type="range"
-                            min="0.1"
-                            max="1.0"
-                            step="0.1"
-                            value={voiceSettings.volume}
-                            onChange={(e) => handleVoiceSettingsChange({ volume: parseFloat(e.target.value) })}
-                            className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer slider"
-                          />
-                          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                            <span>Тихо</span>
-                            <span>Громко</span>
-                          </div>
-                        </div>
-
-                        <div className="pt-4 border-t border-border">
-                          <div className="flex items-center gap-2">
-                            <button 
-                              onClick={handleTestVoice}
-                              disabled={tts.state.isSpeaking}
-                              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {tts.state.isSpeaking ? (
-                                <>
-                                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                  </svg>
-                                  Говорит...
-                                </>
-                              ) : (
-                                <>
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 14.142M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                                  </svg>
-                                  Протестировать голос
-                                </>
-                              )}
-                            </button>
-                            
-                            {tts.state.isSpeaking && (
-                              <button
-                                onClick={tts.stop}
-                                className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md text-sm font-medium hover:bg-secondary/90 transition-colors"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h6v4H9z" />
-                                </svg>
-                                Остановить
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         )
 
