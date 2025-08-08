@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TextToSpeechControls } from '@/components/app/text-to-speech-controls'
-import { useLanguage } from '@/contexts/language-context'
 
 interface ReadingSettings {
   fontSize: number
@@ -51,7 +50,6 @@ export default function ReadingInterface({
   const contentRef = useRef<HTMLDivElement>(null)
   const touchStartX = useRef<number>(0)
   const touchEndX = useRef<number>(0)
-  const { t } = useLanguage()
   
   const { scrollYProgress } = useScroll({ container: contentRef })
   const progress = useTransform(scrollYProgress, [0, 1], [0, 100])
@@ -116,9 +114,9 @@ export default function ReadingInterface({
   ]
 
   const themeOptions = [
-    { value: 'light', label: t('reader.lightTheme'), bg: 'bg-background', text: 'text-foreground' },
-    { value: 'sepia', label: t('reader.sepiaTheme'), bg: 'bg-amber-50', text: 'text-amber-950' },
-    { value: 'dark', label: t('reader.darkTheme'), bg: 'bg-slate-900', text: 'text-slate-50' },
+    { value: 'light', label: 'Светлая', bg: 'bg-background', text: 'text-foreground' },
+    { value: 'sepia', label: 'Сепия', bg: 'bg-amber-50', text: 'text-amber-950' },
+    { value: 'dark', label: 'Темная', bg: 'bg-slate-900', text: 'text-slate-50' },
     { value: 'night', label: 'Ночь', bg: 'bg-black', text: 'text-green-400' }
   ]
 
@@ -167,7 +165,7 @@ export default function ReadingInterface({
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4" />
-              {t('common.back')}
+              Назад
             </Button>
             
             <h1 className="font-[var(--font-display)] font-semibold text-lg truncate max-w-md text-center">
@@ -294,7 +292,7 @@ export default function ReadingInterface({
             >
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="font-[var(--font-display)] font-semibold text-lg">{t('reader.settings')}</h2>
+                  <h2 className="font-[var(--font-display)] font-semibold text-lg">Настройки чтения</h2>
                   <Button 
                     variant="ghost" 
                     size="sm"
@@ -310,7 +308,7 @@ export default function ReadingInterface({
                     <div className="flex items-center justify-between mb-3">
                       <label className="flex items-center gap-2 text-sm font-medium">
                         <Type className="h-4 w-4" />
-                        {t('reader.fontSize')}
+                        Размер шрифта
                       </label>
                       <span className="text-xs text-muted-foreground">{settings.fontSize}px</span>
                     </div>
@@ -346,7 +344,7 @@ export default function ReadingInterface({
                   <div>
                     <label className="flex items-center gap-2 text-sm font-medium mb-3">
                       <Type className="h-4 w-4" />
-                      {t('reader.fontFamily')}
+                      Семейство шрифтов
                     </label>
                     <Select value={settings.fontFamily} onValueChange={(value) => updateSetting('fontFamily', value)}>
                       <SelectTrigger>
@@ -366,7 +364,7 @@ export default function ReadingInterface({
                   <div>
                     <label className="flex items-center gap-2 text-sm font-medium mb-3">
                       <Palette className="h-4 w-4" />
-                      {t('reader.theme')}
+                      Тема
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       {themeOptions.map(theme => (
@@ -391,7 +389,7 @@ export default function ReadingInterface({
                     <div className="flex items-center justify-between mb-3">
                       <label className="flex items-center gap-2 text-sm font-medium">
                         <AlignLeft className="h-4 w-4" />
-                        {t('reader.lineHeight')}
+                        Межстрочный интервал
                       </label>
                       <span className="text-xs text-muted-foreground">{settings.lineHeight}</span>
                     </div>
@@ -407,7 +405,7 @@ export default function ReadingInterface({
                   {/* Ширина полей */}
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <label className="text-sm font-medium">{t('reader.margin')}</label>
+                      <label className="text-sm font-medium">Ширина полей</label>
                       <span className="text-xs text-muted-foreground">{settings.margin}px</span>
                     </div>
                     <Slider

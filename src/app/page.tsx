@@ -120,56 +120,37 @@ export default function HomePage() {
     'Учебная литература'
   ]
 
-  // Доступные языки и голоса
-  const availableLanguages = [
-    { code: 'ru-RU', name: 'Русский' },
-    { code: 'en-US', name: 'English (US)' },
-    { code: 'en-GB', name: 'English (UK)' },
-    { code: 'es-ES', name: 'Español' },
-    { code: 'fr-FR', name: 'Français' },
-    { code: 'de-DE', name: 'Deutsch' },
-    { code: 'it-IT', name: 'Italiano' },
-    { code: 'pt-BR', name: 'Português (Brasil)' },
-    { code: 'zh-CN', name: '中文 (简体)' },
-    { code: 'ja-JP', name: '日本語' },
-    { code: 'ko-KR', name: '한국어' }
-  ]
-
-  // Получение голосов для выбранного языка
-  const getAvailableVoices = () => {
-    const languageVoices = tts.getVoicesForLanguage(voiceSettings.language)
-    return [
-      { id: 'default', name: 'Системный голос по умолчанию' },
-      ...languageVoices.map(voice => ({
-        id: voice.voice.name,
-        name: voice.name
-      }))
-    ]
-  }
-
   // Theme management
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme')
-    if (savedTheme === 'dark') {
-      setIsDarkMode(true)
-      document.documentElement.classList.add('dark')
-    }
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('theme')
+      if (savedTheme === 'dark') {
+        setIsDarkMode(true)
+        document.documentElement.classList.add('dark')
+      }
 
-    // Загрузка настроек озвучивания
-    const savedVoiceSettings = localStorage.getItem('voiceSettings')
-    if (savedVoiceSettings) {
-      setVoiceSettings(JSON.parse(savedVoiceSettings))
+      // Загрузка настроек озвучивания
+      const savedVoiceSettings = localStorage.getItem('voiceSettings')
+      if (savedVoiceSettings) {
+        try {
+          setVoiceSettings(JSON.parse(savedVoiceSettings))
+        } catch (error) {
+          console.error('Error parsing voice settings:', error)
+        }
+      }
     }
   }, [])
 
   const handleThemeToggle = () => {
     setIsDarkMode(!isDarkMode)
-    if (!isDarkMode) {
-      document.documentElement.classList.add('dark')
-      localStorage.setItem('theme', 'dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-      localStorage.setItem('theme', 'light')
+    if (typeof window !== 'undefined') {
+      if (!isDarkMode) {
+        document.documentElement.classList.add('dark')
+        localStorage.setItem('theme', 'dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+        localStorage.setItem('theme', 'light')
+      }
     }
   }
 
@@ -177,35 +158,34 @@ export default function HomePage() {
   const handleVoiceSettingsChange = (newSettings: Partial<typeof voiceSettings>) => {
     const updatedSettings = { ...voiceSettings, ...newSettings }
     setVoiceSettings(updatedSettings)
-    localStorage.setItem('voiceSettings', JSON.stringify(updatedSettings))
     
-    // Update TTS settings
-    tts.updateSettings({
-      rate: updatedSettings.speed,
-      pitch: updatedSettings.pitch,
-      volume: updatedSettings.volume,
-      voice: updatedSettings.voice !== 'default' ? updatedSettings.voice : null
-    })
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('voiceSettings', JSON.stringify(updatedSettings))
+    }
+    
+    // Update TTS settings safely
+    if (tts && tts.updateSettings) {
+      tts.updateSettings({
+        rate: updatedSettings.speed,
+        pitch: updatedSettings.pitch,
+        volume: updatedSettings.volume,
+        voice: updatedSettings.voice !== 'default' ? updatedSettings.voice : null
+      })
+    }
   }
 
   // Обработчик тестирования голоса
   const handleTestVoice = () => {
     const testTexts = {
       'ru-RU': 'Привет! Это тест голоса для озвучивания книг. Как вам звучит этот голос?',
-      'en-US': 'Hello! This is a voice test for reading books aloud. How does this voice sound to you?',
-      'en-GB': 'Hello! This is a voice test for reading books aloud. How does this voice sound to you?',
-      'es-ES': '¡Hola! Esta es una prueba de voz para leer libros en voz alta. ¿Cómo te suena esta voz?',
-      'fr-FR': 'Bonjour! Ceci est un test de voix pour lire des livres à haute voix. Comment cette voix vous sonne-t-elle?',
-      'de-DE': 'Hallo! Dies ist ein Stimmtest zum Vorlesen von Büchern. Wie klingt diese Stimme für Sie?',
-      'it-IT': 'Ciao! Questo è un test vocale per leggere libri ad alta voce. Come ti suona questa voce?',
-      'pt-BR': 'Olá! Este é um teste de voz para ler livros em voz alta. Como esta voz soa para você?',
-      'zh-CN': '你好！这是朗读书籍的语音测试。这个声音听起来怎么样？',
-      'ja-JP': 'こんにちは！これは本を音読するための音声テストです。この声はいかがですか？',
-      'ko-KR': '안녕하세요! 이것은 책을 소리 내어 읽기 위한 음성 테스트입니다. 이 목소리가 어떻게 들리나요?'
+      'en-US': 'Hello! This is a voice test for reading books aloud. How does this voice sound to you?'
     }
 
-    const testText = testTexts[voiceSettings.language as keyof typeof testTexts] || testTexts['en-US']
-    tts.speak(testText, voiceSettings.language)
+    const testText = testTexts[voiceSettings.language as keyof typeof testTexts] || testTexts['ru-RU']
+    
+    if (tts && tts.speak) {
+      tts.speak(testText, voiceSettings.language)
+    }
   }
 
   // Navigation handling
@@ -225,7 +205,6 @@ export default function HomePage() {
 
   const handleBookDetails = (bookId: string) => {
     console.log('Showing details for book:', bookId)
-    // This could open a book details modal or navigate to a details page
   }
 
   const handleBookAdd = () => {
@@ -252,10 +231,9 @@ export default function HomePage() {
     // Add to books collection
     setBooks(prevBooks => [newBook, ...prevBooks])
     
-    // Show success notification (you could implement a toast system)
     console.log('Книга добавлена:', newBook)
     
-    // Optionally switch to library view to show the new book
+    // Switch to library view
     if (activeSection !== 'library') {
       setActiveSection('library')
     }
@@ -278,7 +256,6 @@ export default function HomePage() {
 
   const handlePageChange = (page: number) => {
     console.log('Page changed to:', page)
-    // Update reading progress if needed
   }
 
   const handleReadingSettingsChange = (newSettings: typeof readingSettings) => {
@@ -288,12 +265,10 @@ export default function HomePage() {
   // Collection handlers
   const handleCollectionCreate = (name: string) => {
     console.log('Creating collection:', name)
-    // Add collection creation logic
   }
 
   const handleCollectionSelect = (collection: any) => {
     console.log('Selected collection:', collection)
-    // Show collection contents
   }
 
   // Filter books based on active section
@@ -302,7 +277,6 @@ export default function HomePage() {
       case 'reading':
         return books.filter(book => book.progress > 0 && book.progress < 100)
       case 'favorites':
-        // For now, showing high-rated books as favorites
         return books.filter(book => book.progress > 50)
       default:
         return books

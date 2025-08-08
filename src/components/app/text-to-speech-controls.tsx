@@ -12,8 +12,7 @@ import {
   Square, 
   Volume2, 
   Settings, 
-  ChevronDown, 
-  ChevronUp,
+  ChevronDown,
   Mic,
   SkipForward,
   SkipBack,
@@ -23,7 +22,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
-import { useLanguage } from "@/contexts/language-context";
 
 interface TextToSpeechControlsProps {
   text: string;
@@ -38,7 +36,7 @@ export const TextToSpeechControls = ({
 }: TextToSpeechControlsProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isFloating, setIsFloating] = useState(true);
-  const { language } = useLanguage();
+  const [currentLanguage] = useState('ru-RU');
   
   const tts = useTextToSpeech({
     onWordBoundary: (charIndex, word) => {
@@ -46,7 +44,7 @@ export const TextToSpeechControls = ({
     }
   });
 
-  const languageVoices = tts.getVoicesForLanguage(language === 'ru' ? 'ru-RU' : 'en-US');
+  const languageVoices = tts.getVoicesForLanguage(currentLanguage);
 
   if (!tts.isSupported) {
     return (
@@ -273,7 +271,7 @@ export const TextToSpeechControls = ({
         <div className="space-y-2">
           <label className="text-sm font-medium flex items-center space-x-2">
             <Mic className="h-4 w-4" />
-            <span>Голос ({language})</span>
+            <span>Голос (RU)</span>
           </label>
           <Select 
             value={tts.settings.voice || ''} 
@@ -296,7 +294,7 @@ export const TextToSpeechControls = ({
                 ))
               ) : (
                 <SelectItem value="none" disabled>
-                  Нет голосов для {language}
+                  Нет доступных голосов
                 </SelectItem>
               )}
             </SelectContent>

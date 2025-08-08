@@ -4,8 +4,6 @@ import React from 'react'
 import { Book, Heart, Library, Search, Settings, BookOpen, FolderOpen, Moon, Sun, User, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { useLanguage } from '@/contexts/language-context'
-import { LanguageSwitcher } from '@/components/app/language-switcher'
 
 interface NavigationItem {
   id: string
@@ -30,37 +28,37 @@ interface SidebarNavigationProps {
 const navigationItems: NavigationItem[] = [
   {
     id: 'library',
-    labelKey: 'navigation.library',
+    labelKey: 'Библиотека',
     icon: Library,
     href: '/library'
   },
   {
     id: 'collections',
-    labelKey: 'navigation.collections',
+    labelKey: 'Коллекции',
     icon: FolderOpen,
     href: '/collections'
   },
   {
     id: 'reading',
-    labelKey: 'navigation.reading',
+    labelKey: 'Чтение',
     icon: BookOpen,
     href: '/reading'
   },
   {
     id: 'favorites',
-    labelKey: 'navigation.favorites',
+    labelKey: 'Избранное',
     icon: Heart,
     href: '/favorites'
   },
   {
     id: 'search',
-    labelKey: 'navigation.search',
+    labelKey: 'Поиск',
     icon: Search,
     href: '/search'
   },
   {
     id: 'settings',
-    labelKey: 'navigation.settings',
+    labelKey: 'Настройки',
     icon: Settings,
     href: '/settings'
   }
@@ -77,7 +75,6 @@ export default function SidebarNavigation({
     email: 'user@example.com'
   }
 }: SidebarNavigationProps) {
-  const { t, language, changeLanguage } = useLanguage()
 
   return (
     <div className="w-[280px] h-full bg-sidebar border-r border-sidebar-border flex flex-col">
@@ -101,7 +98,7 @@ export default function SidebarNavigation({
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <Plus className="w-4 h-4 mr-2" />
-            {t('books.addBook')}
+            Добавить книгу
           </Button>
         </div>
       )}
@@ -124,7 +121,7 @@ export default function SidebarNavigation({
               onClick={() => onSectionChange(item.id)}
             >
               <Icon className="w-4 h-4 mr-3" />
-              {t(item.labelKey)}
+              {item.labelKey}
             </Button>
           )
         })}
@@ -132,19 +129,6 @@ export default function SidebarNavigation({
 
       {/* Нижняя часть */}
       <div className="p-4 border-t border-sidebar-border space-y-4">
-        {/* Переключатель языка */}
-        <div className="space-y-2">
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            {t('settings.language')}
-          </div>
-          <LanguageSwitcher
-            variant="compact"
-            currentLanguage={language}
-            onLanguageChange={changeLanguage}
-            className="w-full"
-          />
-        </div>
-
         {/* Переключатель темы */}
         <Button
           variant="ghost"
