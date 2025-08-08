@@ -1,0 +1,317 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  /* Shadcn/UI Base Colors - Modified for My Book */
+  --color-background: #ffffff;
+  --color-foreground: #0f172a; /* Text Primary */
+
+  --color-card: #f8fafc; /* Surface */
+  --color-card-foreground: #0f172a; /* Text Primary */
+
+  --color-popover: #ffffff; /* Same as background for consistency */
+  --color-popover-foreground: #0f172a; /* Text Primary */
+
+  --color-primary: #2563eb; /* Primary */
+  --color-primary-foreground: #ffffff; /* White for primary text */
+
+  --color-secondary: #64748b; /* Secondary */
+  --color-secondary-foreground: #ffffff; /* White for secondary text */
+
+  --color-muted: #f1f5f9; /* Muted */
+  --color-muted-foreground: #475569; /* Text Secondary */
+
+  --color-accent: #2563eb; /* Primary - using primary for accent */
+  --color-accent-foreground: #ffffff; /* White for accent text */
+
+  --color-destructive: #ef4444; /* Default destructive */
+  --color-destructive-foreground: #fafafa;
+
+  --color-border: #e2e8f0; /* Light gray for borders */
+  --color-input: #f8fafc; /* Surface for input background */
+  --color-ring: #2563eb; /* Primary for ring focus */
+
+  /* Chart colors - keeping defaults for now as no specific chart colors were mentioned */
+  --color-chart-1: #e67e22;
+  --color-chart-2: #2d8659;
+  --color-chart-3: #1e3a5f;
+  --color-chart-4: #f1c40f;
+  --color-chart-5: #e74c3c;
+
+  /* Sidebar specific colors based on My Book design (assuming light sidebar on light theme) */
+  --color-sidebar: #f8fafc; /* Surface for sidebar background */
+  --color-sidebar-foreground: #0f172a; /* Text Primary for sidebar text */
+  --color-sidebar-primary: #2563eb; /* Primary for active sidebar items */
+  --color-sidebar-primary-foreground: #ffffff;
+  --color-sidebar-accent: #e0e7ff; /* Lighter shade of primary for hover/active background */
+  --color-sidebar-accent-foreground: #2563eb; /* Primary for text on accent sidebar */
+  --color-sidebar-border: #e2e8f0; /* Default border for sidebar separators */
+  --color-sidebar-ring: #2563eb;
+
+  /* Additional Design System Colors */
+  --color-text-primary: #0f172a; /* Text Primary */
+  --color-text-secondary: #475569; /* Text Secondary */
+  --color-text-accent: #f59e0b; /* Accent for progress/notifications */
+  --color-neutral-light: #f1f5f9; /* Muted */
+  --color-neutral-dark: #64748b; /* Secondary */
+
+  /* Design System Typography */
+  --font-display: "Inter", sans-serif;
+  --font-body: system-ui, sans-serif;
+  --font-reading: Georgia, Charter, serif;
+
+  /* Shadcn Radius (adjusted to be consistent with minimal aesthetic) */
+  --radius-lg: 0.5rem;
+  --radius-md: calc(0.5rem - 2px);
+  --radius-sm: calc(0.5rem - 4px);
+
+  /* Shadcn Animations */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border); /* Use design system border color */
+  }
+}
+
+/* My Book Typography & Global Styles */
+@layer utilities {
+  body {
+    font-family: var(--font-body); /* Default body font */
+    font-size: 16px; /* Base font size */
+    line-height: 1.5;
+  }
+}
+
+@layer base {
+  :root {
+    /* Mapped Shadcn/UI tokens to Design System */
+    --background: var(--color-background);
+    --foreground: var(--color-foreground);
+    --card: var(--color-card);
+    --card-foreground: var(--color-card-foreground);
+    --popover: var(--color-popover);
+    --popover-foreground: var(--color-popover-foreground);
+    --primary: var(--color-primary);
+    --primary-foreground: var(--color-primary-foreground);
+    --secondary: var(--color-secondary);
+    --secondary-foreground: var(--color-secondary-foreground);
+    --muted: var(--color-muted);
+    --muted-foreground: var(--color-muted-foreground);
+    --accent: var(--color-accent);
+    --accent-foreground: var(--color-accent-foreground);
+    --destructive: var(--color-destructive);
+    --destructive-foreground: var(--color-destructive-foreground);
+    --border: var(--color-border);
+    --input: var(--color-input);
+    --ring: var(--color-ring);
+
+    --chart-1: var(--color-chart-1);
+    --chart-2: var(--color-chart-2);
+    --chart-3: var(--color-chart-3);
+    --chart-4: var(--color-chart-4);
+    --chart-5: var(--color-chart-5);
+
+    --radius: var(--radius-lg); /* Default radius for Shadcn components */
+
+    --sidebar-background: var(--color-sidebar);
+    --sidebar-foreground: var(--color-sidebar-foreground);
+    --sidebar-primary: var(--color-sidebar-primary);
+    --sidebar-primary-foreground: var(--color-sidebar-primary-foreground);
+    --sidebar-accent: var(--color-sidebar-accent);
+    --sidebar-accent-foreground: var(--color-sidebar-accent-foreground);
+    --sidebar-border: var(--color-sidebar-border);
+    --sidebar-ring: var(--color-sidebar-ring);
+
+    /* Dark mode based on general design system principles no explicit dark mode in the website design*/
+    /* My Book Dark Mode (inferred minimal dark contrast) */
+    @media (prefers-color-scheme: dark) {
+      --background: #0f172a; /* Dark Blue */
+      --foreground: #f8fafc; /* Light Surface for text */
+      --card: #1e293b; /* Slightly lighter dark blue for cards */
+      --card-foreground: #f8fafc;
+      --popover: #1e293b;
+      --popover-foreground: #f8fafc;
+      --primary: #60a5fa; /* Lighter primary for accent in dark mode */
+      --primary-foreground: #0f172a;
+      --secondary: #475569; /* Darker secondary */
+      --secondary-foreground: #e2e8f0;
+      --muted: #1e293b; /* Muted dark */
+      --muted-foreground: #94a3b8;
+      --accent: #60a5fa;
+      --accent-foreground: #0f172a;
+      --destructive: #ef4444; /* Keeping default destructive */
+      --destructive-foreground: #fafafa;
+      --border: #334155; /* Darker border */
+      --input: #1e293b;
+      --ring: #60a5fa;
+
+      --sidebar-background: #1e293b;
+      --sidebar-foreground: #f8fafc;
+      --sidebar-primary: #60a5fa;
+      --sidebar-primary-foreground: #0f172a;
+      --sidebar-accent: #334155;
+      --sidebar-accent-foreground: #60a5fa;
+      --sidebar-border: #334155;
+      --sidebar-ring: #60a5fa;
+    }
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+
+  h1 { font-size: 48px; }
+  h2 { font-size: 32px; }
+  h3 { font-size: 24px; }
+  h4 { font-size: 18px; }
+  h5 { font-size: 16px; }
+  h6 { font-size: 14px; }
+
+  p {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--text-primary);
+  }
+
+  a {
+    color: var(--primary);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+
+  /* Font classes for specific use cases */
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-reading {
+    font-family: var(--font-reading);
+  }
+
+  .text-primary {
+    color: var(--text-primary);
+  }
+
+  .text-secondary {
+    color: var(--text-secondary);
+  }
+
+  .text-accent {
+    color: var(--text-accent);
+  }
+
+  .container {
+    margin-inline: auto;
+    padding-inline: 2rem;
+  }
+
+  /* Кастомные стили для слайдеров */
+  .slider {
+    background: var(--color-muted);
+  }
+  
+  .slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    cursor: pointer;
+    border: 2px solid var(--color-background);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .slider::-webkit-slider-thumb:hover {
+    background: var(--color-primary);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  }
+  
+  .slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    cursor: pointer;
+    border: 2px solid var(--color-background);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .slider::-moz-range-thumb:hover {
+    background: var(--color-primary);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  }
+  
+  .slider::-webkit-slider-track {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--color-muted);
+  }
+  
+  .slider::-moz-range-track {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--color-muted);
+    border: none;
+  }
+
+  /* Dark mode slider styles */
+  .dark .slider::-webkit-slider-thumb {
+    background: var(--color-primary);
+    border-color: var(--color-background);
+  }
+
+  .dark .slider::-moz-range-thumb {
+    background: var(--color-primary);
+    border-color: var(--color-background);
+  }
+}
