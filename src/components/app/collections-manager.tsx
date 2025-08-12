@@ -1,481 +1,415 @@
-"use client"
+"use client";
 
-import React, { useState, useCallback } from 'react'
-import { motion } from 'motion/react'
+import { useState, useCallback, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Plus, 
-  MoreHorizontal, 
-  Edit2, 
+  Edit, 
   Trash2, 
-  Download,
-  Clock,
+  Book, 
+  Grid3X3, 
+  Search, 
+  ArrowLeft,
   BookOpen,
-  CheckCircle,
-  Heart,
-  Search,
-  Filter,
-  Grid3X3,
-  List
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu'
-import { Badge } from '@/components/ui/badge'
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
-} from '@/components/ui/dialog'
+  Check,
+  Clock,
+  MoreHorizontal
+} from "lucide-react";
 
 interface Book {
-  id: string
-  title: string
-  author: string
-  cover: string
-  progress?: number
+  id: string;
+  title: string;
+  author: string;
+  cover?: string;
+  status?: "want-to-read" | "currently-reading" | "read";
 }
 
 interface Collection {
-  id: string
-  name: string
-  books: Book[]
-  isSystem: boolean
-  icon?: React.ElementType
-  color?: string
+  id: string;
+  name: string;
+  description?: string;
+  books: Book[];
+  isDefault?: boolean;
+  createdAt: Date;
 }
 
-interface CollectionsManagerProps {
-  collections?: Collection[]
-  onCollectionCreate?: (name: string) => void
-  onCollectionRename?: (id: string, name: string) => void
-  onCollectionDelete?: (id: string) => void
-  onCollectionExport?: (id: string) => void
-  onBookMove?: (bookId: string, fromCollectionId: string, toCollectionId: string) => void
-  onCollectionSelect?: (collection: Collection) => void
-  onBookAdd?: () => void
+interface BookCollectionManagerProps {
+  onCollectionCreate?: (collection: Omit<Collection, 'id' | 'createdAt'>) => void;
+  onCollectionSelect?: (collectionId: string) => void;
+  onBookAdd?: (collectionId: string, book: Book) => void;
 }
 
-const defaultBooks: Book[] = [
-  {
-    id: '1',
-    title: 'Война и мир',
-    author: 'Лев Толстой',
-    cover: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=200&h=300&fit=crop&crop=entropy&auto=format',
-    progress: 65
-  },
-  {
-    id: '2',
-    title: 'Преступление и наказание',
-    author: 'Федор Достоевский',
-    cover: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=200&h=300&fit=crop&crop=entropy&auto=format',
-    progress: 100
-  },
-  {
-    id: '3',
-    title: 'Мастер и Маргарита',
-    author: 'Михаил Булгаков',
-    cover: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=300&fit=crop&crop=entropy&auto=format',
-    progress: 30
-  },
-  {
-    id: '4',
-    title: 'Анна Каренина',
-    author: 'Лев Толстой',
-    cover: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=200&h=300&fit=crop&crop=entropy&auto=format'
-  }
-]
-
-const defaultCollections: Collection[] = [
-  {
-    id: 'recent',
-    name: 'Недавно добавленные',
-    books: defaultBooks.slice(0, 2),
-    isSystem: true,
-    icon: Clock,
-    color: 'text-blue-500'
-  },
-  {
-    id: 'reading',
-    name: 'В процессе',
-    books: defaultBooks.filter(book => book.progress && book.progress < 100),
-    isSystem: true,
-    icon: BookOpen,
-    color: 'text-orange-500'
-  },
-  {
-    id: 'completed',
-    name: 'Прочитанные',
-    books: defaultBooks.filter(book => book.progress === 100),
-    isSystem: true,
-    icon: CheckCircle,
-    color: 'text-green-500'
-  },
-  {
-    id: 'favorites',
-    name: 'Избранное',
-    books: defaultBooks.slice(1, 3),
-    isSystem: true,
-    icon: Heart,
-    color: 'text-red-500'
-  },
-  {
-    id: 'custom1',
-    name: 'Русская классика',
-    books: defaultBooks,
-    isSystem: false
-  },
-  {
-    id: 'custom2',
-    name: 'Научная фантастика',
-    books: defaultBooks.slice(0, 3),
-    isSystem: false
-  }
-]
-
-export default function CollectionsManager({
-  collections = defaultCollections,
+export const BookCollectionManager = ({
   onCollectionCreate,
-  onCollectionRename,
-  onCollectionDelete,
-  onCollectionExport,
-  onBookMove,
   onCollectionSelect,
   onBookAdd
-}: CollectionsManagerProps) {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [newCollectionName, setNewCollectionName] = useState('')
-  const [editingCollection, setEditingCollection] = useState<string | null>(null)
-  const [editName, setEditName] = useState('')
+}: BookCollectionManagerProps) => {
+  const [collections, setCollections] = useState<Collection[]>([
+    {
+      id: "want-to-read",
+      name: "Want to Read",
+      description: "Books you plan to read",
+      books: [],
+      isDefault: true,
+      createdAt: new Date()
+    },
+    {
+      id: "currently-reading",
+      name: "Currently Reading", 
+      description: "Books you're reading now",
+      books: [],
+      isDefault: true,
+      createdAt: new Date()
+    },
+    {
+      id: "read",
+      name: "Read",
+      description: "Books you've finished",
+      books: [],
+      isDefault: true,
+      createdAt: new Date()
+    }
+  ]);
 
-  const filteredCollections = collections.filter(collection =>
-    collection.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isAddBookDialogOpen, setIsAddBookDialogOpen] = useState(false);
+  const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [newCollectionDescription, setNewCollectionDescription] = useState("");
+  const [newBookTitle, setNewBookTitle] = useState("");
+  const [newBookAuthor, setNewBookAuthor] = useState("");
+
+  const filteredCollections = useMemo(() => {
+    return collections.filter(collection =>
+      collection.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      collection.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [collections, searchQuery]);
 
   const handleCreateCollection = useCallback(() => {
-    if (newCollectionName.trim()) {
-      onCollectionCreate?.(newCollectionName.trim())
-      setNewCollectionName('')
-      setIsCreateDialogOpen(false)
+    if (!newCollectionName.trim()) return;
+
+    const newCollection: Collection = {
+      id: Date.now().toString(),
+      name: newCollectionName,
+      description: newCollectionDescription,
+      books: [],
+      createdAt: new Date()
+    };
+
+    setCollections(prev => [...prev, newCollection]);
+    onCollectionCreate?.(newCollection);
+    
+    setNewCollectionName("");
+    setNewCollectionDescription("");
+    setIsCreateDialogOpen(false);
+  }, [newCollectionName, newCollectionDescription, onCollectionCreate]);
+
+  const handleEditCollection = useCallback((collection: Collection) => {
+    setEditingCollection(collection);
+    setNewCollectionName(collection.name);
+    setNewCollectionDescription(collection.description || "");
+    setIsCreateDialogOpen(true);
+  }, []);
+
+  const handleUpdateCollection = useCallback(() => {
+    if (!editingCollection || !newCollectionName.trim()) return;
+
+    setCollections(prev => prev.map(col => 
+      col.id === editingCollection.id 
+        ? { ...col, name: newCollectionName, description: newCollectionDescription }
+        : col
+    ));
+
+    setEditingCollection(null);
+    setNewCollectionName("");
+    setNewCollectionDescription("");
+    setIsCreateDialogOpen(false);
+  }, [editingCollection, newCollectionName, newCollectionDescription]);
+
+  const handleDeleteCollection = useCallback((collectionId: string) => {
+    setCollections(prev => prev.filter(col => col.id !== collectionId));
+    if (selectedCollection === collectionId) {
+      setSelectedCollection(null);
     }
-  }, [newCollectionName, onCollectionCreate])
+  }, [selectedCollection]);
 
-  const handleStartEdit = useCallback((collection: Collection) => {
-    setEditingCollection(collection.id)
-    setEditName(collection.name)
-  }, [])
+  const handleAddBook = useCallback(() => {
+    if (!selectedCollection || !newBookTitle.trim() || !newBookAuthor.trim()) return;
 
-  const handleSaveEdit = useCallback(() => {
-    if (editingCollection && editName.trim()) {
-      onCollectionRename?.(editingCollection, editName.trim())
-      setEditingCollection(null)
-      setEditName('')
-    }
-  }, [editingCollection, editName, onCollectionRename])
+    const newBook: Book = {
+      id: Date.now().toString(),
+      title: newBookTitle,
+      author: newBookAuthor,
+      status: selectedCollection === "want-to-read" ? "want-to-read" : 
+             selectedCollection === "currently-reading" ? "currently-reading" : "read"
+    };
 
-  const handleCancelEdit = useCallback(() => {
-    setEditingCollection(null)
-    setEditName('')
-  }, [])
+    setCollections(prev => prev.map(col => 
+      col.id === selectedCollection 
+        ? { ...col, books: [...col.books, newBook] }
+        : col
+    ));
 
-  const CollectionCard = ({ collection }: { collection: Collection }) => {
-    const Icon = collection.icon
-    const displayBooks = collection.books.slice(0, 4)
-    const remainingCount = Math.max(0, collection.books.length - 4)
+    onBookAdd?.(selectedCollection, newBook);
+    
+    setNewBookTitle("");
+    setNewBookAuthor("");
+    setIsAddBookDialogOpen(false);
+  }, [selectedCollection, newBookTitle, newBookAuthor, onBookAdd]);
 
+  const handleRemoveBook = useCallback((collectionId: string, bookId: string) => {
+    setCollections(prev => prev.map(col => 
+      col.id === collectionId 
+        ? { ...col, books: col.books.filter(book => book.id !== bookId) }
+        : col
+    ));
+  }, []);
+
+  const getCollectionStats = useCallback((collection: Collection) => {
+    const total = collection.books.length;
+    const completed = collection.books.filter(book => book.status === "read").length;
+    const inProgress = collection.books.filter(book => book.status === "currently-reading").length;
+    return { total, completed, inProgress };
+  }, []);
+
+  const getCollectionCover = useCallback((collection: Collection) => {
+    const bookWithCover = collection.books.find(book => book.cover);
+    return bookWithCover?.cover;
+  }, []);
+
+  const selectedCollectionData = collections.find(col => col.id === selectedCollection);
+
+  if (selectedCollection && selectedCollectionData) {
+    const stats = getCollectionStats(selectedCollectionData);
+    
     return (
-      <motion.div
-        layout
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 20 }}
-        whileHover={{ y: -4 }}
-        className="group relative bg-surface rounded-lg p-6 border border-border hover:border-primary/30 transition-all duration-200 cursor-pointer"
-        onClick={() => onCollectionSelect?.(collection)}
-      >
-        <div className="absolute top-4 right-4">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-popover">
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleStartEdit(collection)
-                }}
-              >
-                <Edit2 className="h-4 w-4 mr-2" />
-                Переименовать
-              </DropdownMenuItem>
-              {!collection.isSystem && (
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onCollectionDelete?.(collection.id)
-                  }}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Удалить
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onCollectionExport?.(collection.id)
-                }}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Экспорт
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            {Icon && (
-              <div className={`p-2 rounded-lg bg-muted ${collection.color || 'text-foreground'}`}>
-                <Icon className="h-5 w-5" />
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              {editingCollection === collection.id ? (
-                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  <Input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSaveEdit()
-                      if (e.key === 'Escape') handleCancelEdit()
-                    }}
-                    className="h-8 text-sm"
-                    autoFocus
-                  />
-                  <Button size="sm" onClick={handleSaveEdit}>
-                    ✓
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
-                    ✕
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <h3 className="font-display font-semibold text-foreground truncate">
-                    {collection.name}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {collection.books.length} {collection.books.length === 1 ? 'книга' : 'книг'}
-                  </p>
-                </>
+      <div className="space-y-6 p-6 max-w-7xl mx-auto">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedCollection(null)}
+              className="hover:bg-accent"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Collections
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">{selectedCollectionData.name}</h1>
+              {selectedCollectionData.description && (
+                <p className="text-muted-foreground mt-1">{selectedCollectionData.description}</p>
               )}
             </div>
           </div>
+          
+          <Dialog open={isAddBookDialogOpen} onOpenChange={setIsAddBookDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-primary/90">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Book
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Book to {selectedCollectionData.name}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Input
+                  placeholder="Book title"
+                  value={newBookTitle}
+                  onChange={(e) => setNewBookTitle(e.target.value)}
+                />
+                <Input
+                  placeholder="Author"
+                  value={newBookAuthor}
+                  onChange={(e) => setNewBookAuthor(e.target.value)}
+                />
+                <div className="flex gap-2 pt-4">
+                  <Button onClick={handleAddBook} className="flex-1">
+                    Add Book
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsAddBookDialogOpen(false)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
 
-          {collection.books.length > 0 && (
-            <div className="grid grid-cols-4 gap-2">
-              {displayBooks.map((book, index) => (
-                <div
-                  key={book.id}
-                  className="relative aspect-[3/4] rounded-md overflow-hidden bg-muted"
-                >
-                  <img
-                    src={book.cover}
-                    alt={book.title}
-                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                  />
-                  {book.progress && book.progress < 100 && (
-                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20">
-                      <div
-                        className="h-full bg-accent transition-all duration-300"
-                        style={{ width: `${book.progress}%` }}
-                      />
+        <div className="flex gap-4 mb-6">
+          <Card className="flex-1">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Book className="h-5 w-5 text-primary" />
+                <div>
+                  <div className="text-2xl font-bold">{stats.total}</div>
+                  <div className="text-sm text-muted-foreground">Total Books</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="flex-1">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Check className="h-5 w-5 text-green-600" />
+                <div>
+                  <div className="text-2xl font-bold">{stats.completed}</div>
+                  <div className="text-sm text-muted-foreground">Completed</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="flex-1">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-blue-600" />
+                <div>
+                  <div className="text-2xl font-bold">{stats.inProgress}</div>
+                  <div className="text-sm text-muted-foreground">In Progress</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-4">
+          {selectedCollectionData.books.length === 0 ? (
+            <Card className="p-8 text-center">
+              <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">No books yet</h3>
+              <p className="text-muted-foreground mb-4">
+                Start building your collection by adding your first book.
+              </p>
+              <Button onClick={() => setIsAddBookDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First Book
+              </Button>
+            </Card>
+          ) : (
+            selectedCollectionData.books.map((book) => (
+              <Card key={book.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded flex items-center justify-center">
+                        <Book className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">{book.title}</h3>
+                        <p className="text-sm text-muted-foreground">by {book.author}</p>
+                        {book.status && (
+                          <Badge variant="secondary" className="mt-1">
+                            {book.status.replace('-', ' ')}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))}
-              {remainingCount > 0 && (
-                <div className="aspect-[3/4] rounded-md bg-muted/50 border-2 border-dashed border-border flex items-center justify-center">
-                  <span className="text-xs text-muted-foreground font-medium">
-                    +{remainingCount}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {collection.books.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">Коллекция пуста</p>
-            </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveBook(selectedCollection, book.id)}
+                      className="hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
           )}
         </div>
-      </motion.div>
-    )
+      </div>
+    );
   }
 
   return (
-    <div className="bg-background min-h-screen">
-      <div className="container max-w-7xl mx-auto p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-display font-bold text-foreground mb-2">
-              Мои коллекции
-            </h1>
-            <p className="text-muted-foreground">
-              Организуйте свою библиотеку по коллекциям
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Поиск коллекций..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-64 bg-input"
-              />
-            </div>
-
-            <div className="flex items-center border rounded-lg bg-surface">
-              <Button
-                variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('grid')}
-              >
-                <Grid3X3 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {onBookAdd && (
-              <Button
-                onClick={onBookAdd}
-                variant="outline"
-                className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Добавить книгу
-              </Button>
-            )}
-
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Создать коллекцию
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-popover">
-                <DialogHeader>
-                  <DialogTitle className="font-display">Новая коллекция</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 pt-4">
-                  <Input
-                    placeholder="Название коллекции"
-                    value={newCollectionName}
-                    onChange={(e) => setNewCollectionName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateCollection()}
-                    className="bg-input"
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsCreateDialogOpen(false)}
-                    >
-                      Отмена
-                    </Button>
-                    <Button
-                      onClick={handleCreateCollection}
-                      disabled={!newCollectionName.trim()}
-                      className="bg-primary text-primary-foreground hover:bg-primary/90"
-                    >
-                      Создать
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+    <div className="space-y-6 p-6 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">My Collections</h1>
+          <p className="text-muted-foreground mt-1">Organize your books into collections</p>
         </div>
-
-        {filteredCollections.length === 0 ? (
-          <div className="text-center py-16">
-            <BookOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="text-xl font-display font-semibold text-foreground mb-2">
-              Коллекции не найдены
-            </h3>
-            <p className="text-muted-foreground mb-6">
-              {searchQuery ? 'Попробуйте изменить поисковый запрос' : 'Создайте свою первую коллекцию'}
-            </p>
-            <div className="flex gap-3 justify-center">
-              {!searchQuery && (
-                <Button
-                  onClick={() => setIsCreateDialogOpen(true)}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+        
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-primary hover:bg-primary/90">
+              <Plus className="h-4 w-4 mr-2" />
+              New Collection
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editingCollection ? 'Edit Collection' : 'Create New Collection'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Input
+                placeholder="Collection name"
+                value={newCollectionName}
+                onChange={(e) => setNewCollectionName(e.target.value)}
+              />
+              <Textarea
+                placeholder="Description (optional)"
+                value={newCollectionDescription}
+                onChange={(e) => setNewCollectionDescription(e.target.value)}
+                rows={3}
+              />
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  onClick={editingCollection ? handleUpdateCollection : handleCreateCollection}
+                  className="flex-1"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Создать коллекцию
+                  {editingCollection ? 'Update' : 'Create'} Collection
                 </Button>
-              )}
-              {onBookAdd && (
-                <Button
-                  onClick={onBookAdd}
-                  variant="outline"
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setIsCreateDialogOpen(false);
+                    setEditingCollection(null);
+                    setNewCollectionName("");
+                    setNewCollectionDescription("");
+                  }}
+                  className="flex-1"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Добавить книгу
+                  Cancel
                 </Button>
-              )}
+              </div>
             </div>
-          </div>
-        ) : (
-          <motion.div
-            layout
-            className={`grid gap-6 ${
-              viewMode === 'grid' 
-                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-                : 'grid-cols-1'
-            }`}
-          >
-            {filteredCollections.map((collection) => (
-              <CollectionCard key={collection.id} collection={collection} />
-            ))}
-          </motion.div>
-        )}
-
-        {filteredCollections.length > 0 && (
-          <div className="mt-12 text-center">
-            <p className="text-sm text-muted-foreground">
-              Показано {filteredCollections.length} из {collections.length} коллекций
-            </p>
-          </div>
-        )}
+          </DialogContent>
+        </Dialog>
       </div>
-    </div>
-  )
-}
+
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search collections..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Button variant="outline" size="sm">
+          <Grid3X3 className="h-4 w-4 mr-2" />
+          View
+        </Button>
+      </div>
+
+      

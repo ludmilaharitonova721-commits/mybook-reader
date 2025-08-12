@@ -1,326 +1,268 @@
-"use client"
+"use client";
 
-import { Book, BookOpen, MoreVertical, Search, Filter, ArrowUpDown, Plus } from "lucide-react"
-import { useState, useMemo } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
+import React, { useState, useMemo } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
+import { Search, Plus, BookOpen, Info, ImageIcon } from 'lucide-react';
 
-interface BookData {
-  id: string
-  title: string
-  author: string
-  genre: string
-  progress: number
-  coverUrl?: string
-  dateAdded: Date
+interface Book {
+  id: string;
+  title: string;
+  author: string;
+  genre: string;
+  progress: number;
+  coverUrl?: string;
+  dateAdded: string;
 }
 
-interface BookLibraryGridProps {
-  books?: BookData[]
-  isLoading?: boolean
-  onBookRead?: (bookId: string) => void
-  onBookDetails?: (bookId: string) => void
-  onBookAdd?: () => void
-  searchQuery?: string
-  onSearchChange?: (query: string) => void
-  sortBy?: 'dateAdded' | 'title' | 'author' | 'progress'
-  onSortChange?: (sortBy: 'dateAdded' | 'title' | 'author' | 'progress') => void
+interface BookGridProps {
+  books: Book[];
+  onBookRead: (book: Book) => void;
+  onBookDetails: (book: Book) => void;
+  onBookAdd: () => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  sortBy: 'dateAdded' | 'title' | 'author' | 'progress';
+  onSortChange: (sortBy: 'dateAdded' | 'title' | 'author' | 'progress') => void;
 }
 
-// Skeleton component for loading state
-function BookCardSkeleton() {
-  return (
-    <Card className="group bg-card border border-border rounded-lg overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 hover:border-primary/20">
-      <div className="relative">
-        <Skeleton className="w-full aspect-[2/3] bg-muted" />
-      </div>
-      <div className="p-4 space-y-3">
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-3/4 bg-muted" />
-          <Skeleton className="h-4 w-1/2 bg-muted" />
-        </div>
-        <Skeleton className="h-5 w-16 bg-muted rounded-full" />
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <Skeleton className="h-3 w-12 bg-muted" />
-            <Skeleton className="h-3 w-8 bg-muted" />
-          </div>
-          <Skeleton className="h-2 w-full bg-muted rounded-full" />
-        </div>
-      </div>
-    </Card>
-  )
-}
-
-// Individual book card component
-function BookCard({ book, onRead, onDetails }: { book: BookData; onRead?: (id: string) => void; onDetails?: (id: string) => void }) {
-  const firstLetter = book.title.charAt(0).toUpperCase()
-
-  return (
-    <Card className="group bg-card border border-border rounded-lg overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 hover:border-primary/20">
-      <div className="relative">
-        {/* Book Cover */}
-        <div className="aspect-[2/3] relative overflow-hidden bg-muted">
-          {book.coverUrl ? (
-            <img
-              src={book.coverUrl}
-              alt={`Cover of ${book.title}`}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
-              <span className="text-6xl font-display font-semibold text-primary">
-                {firstLetter}
-              </span>
-            </div>
-          )}
-          
-          {/* Hover overlay with action buttons */}
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-2">
-            <Button
-              size="sm"
-              onClick={() => onRead?.(book.id)}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg"
-            >
-              <BookOpen className="w-4 h-4 mr-2" />
-              Читать
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onDetails?.(book.id)}
-              className="bg-background/80 backdrop-blur-sm border-border hover:bg-muted shadow-lg"
-            >
-              Подробнее
-            </Button>
-          </div>
-        </div>
-
-        {/* More actions dropdown */}
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="w-8 h-8 p-0 bg-background/80 backdrop-blur-sm hover:bg-muted"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => onRead?.(book.id)}>
-                <BookOpen className="w-4 h-4 mr-2" />
-                Читать
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDetails?.(book.id)}>
-                <Book className="w-4 h-4 mr-2" />
-                Подробнее
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      {/* Book Information */}
-      <div className="p-4 space-y-3">
-        <div className="space-y-1">
-          <h3 className="font-display font-semibold text-foreground leading-tight line-clamp-2">
-            {book.title}
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            {book.author}
-          </p>
-        </div>
-
-        <Badge variant="outline" className="text-xs">
-          {book.genre}
-        </Badge>
-
-        {/* Reading Progress */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center text-xs text-muted-foreground">
-            <span>Прогресс</span>
-            <span>{book.progress}%</span>
-          </div>
-          <Progress 
-            value={book.progress} 
-            className="h-2 bg-muted"
-          />
-        </div>
-      </div>
-    </Card>
-  )
-}
-
-export default function BookLibraryGrid({
-  books = [],
-  isLoading = false,
+export const BookGrid: React.FC<BookGridProps> = ({
+  books,
   onBookRead,
   onBookDetails,
   onBookAdd,
-  searchQuery = "",
+  searchQuery,
   onSearchChange,
-  sortBy = 'dateAdded',
+  sortBy,
   onSortChange,
-}: BookLibraryGridProps) {
-  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery)
-  const [localSortBy, setLocalSortBy] = useState(sortBy)
+}) => {
+  const [imageLoadStates, setImageLoadStates] = useState<Record<string, 'loading' | 'loaded' | 'error'>>({});
 
-  // Handle search change
-  const handleSearchChange = (value: string) => {
-    setLocalSearchQuery(value)
-    onSearchChange?.(value)
-  }
+  const filteredAndSortedBooks = useMemo(() => {
+    let filtered = books.filter(book =>
+      book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      book.genre.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
-  // Handle sort change
-  const handleSortChange = (value: 'dateAdded' | 'title' | 'author' | 'progress') => {
-    setLocalSortBy(value)
-    onSortChange?.(value)
-  }
-
-  // Filter and sort books
-  const processedBooks = useMemo(() => {
-    let filtered = books
-
-    // Apply search filter
-    if (localSearchQuery) {
-      const query = localSearchQuery.toLowerCase()
-      filtered = filtered.filter(book =>
-        book.title.toLowerCase().includes(query) ||
-        book.author.toLowerCase().includes(query) ||
-        book.genre.toLowerCase().includes(query)
-      )
-    }
-
-    // Apply sorting
-    const sorted = [...filtered].sort((a, b) => {
-      switch (localSortBy) {
+    return filtered.sort((a, b) => {
+      switch (sortBy) {
         case 'title':
-          return a.title.localeCompare(b.title)
+          return a.title.localeCompare(b.title);
         case 'author':
-          return a.author.localeCompare(b.author)
+          return a.author.localeCompare(b.author);
         case 'progress':
-          return b.progress - a.progress
+          return b.progress - a.progress;
         case 'dateAdded':
         default:
-          return b.dateAdded.getTime() - a.dateAdded.getTime()
+          return new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime();
       }
-    })
+    });
+  }, [books, searchQuery, sortBy]);
 
-    return sorted
-  }, [books, localSearchQuery, localSortBy])
+  const handleImageLoad = (bookId: string) => {
+    setImageLoadStates(prev => ({ ...prev, [bookId]: 'loaded' }));
+  };
+
+  const handleImageError = (bookId: string) => {
+    setImageLoadStates(prev => ({ ...prev, [bookId]: 'error' }));
+  };
+
+  const handleImageLoadStart = (bookId: string) => {
+    setImageLoadStates(prev => ({ ...prev, [bookId]: 'loading' }));
+  };
+
+  const getImageLoadState = (bookId: string) => {
+    return imageLoadStates[bookId] || 'loading';
+  };
+
+  const CircularProgress = ({ progress }: { progress: number }) => {
+    const radius = 20;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+    return (
+      <div className="relative w-12 h-12">
+        <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 50 50">
+          <circle
+            cx="25"
+            cy="25"
+            r={radius}
+            stroke="currentColor"
+            strokeWidth="3"
+            fill="transparent"
+            className="text-muted/20"
+          />
+          <circle
+            cx="25"
+            cy="25"
+            r={radius}
+            stroke="currentColor"
+            strokeWidth="3"
+            fill="transparent"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            className="text-primary transition-all duration-500 ease-in-out"
+            strokeLinecap="round"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-xs font-medium text-foreground">{progress}%</span>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="bg-background min-h-screen">
-      {/* Header with search and filters */}
-      <div className="mb-8 space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Поиск по названию, автору или жанру..."
-                value={localSearchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="pl-10 bg-input border-border"
-              />
-            </div>
+    <div className="space-y-6">
+      {/* Header Controls */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center flex-1">
+          {/* Search Input */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search books..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="pl-10"
+            />
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={onBookAdd}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Добавить книгу
-            </Button>
-            
-            <Select value={localSortBy} onValueChange={handleSortChange}>
-              <SelectTrigger className="w-48 bg-input border-border">
-                <ArrowUpDown className="w-4 h-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="dateAdded">По дате добавления</SelectItem>
-                <SelectItem value="title">По названию</SelectItem>
-                <SelectItem value="author">По автору</SelectItem>
-                <SelectItem value="progress">По прогрессу</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Sort Select */}
+          <Select value={sortBy} onValueChange={onSortChange}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="dateAdded">Date Added</SelectItem>
+              <SelectItem value="title">Title</SelectItem>
+              <SelectItem value="author">Author</SelectItem>
+              <SelectItem value="progress">Progress</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Results info */}
-        {!isLoading && (
-          <div className="text-sm text-muted-foreground">
-            {processedBooks.length === books.length
-              ? `${books.length} книг`
-              : `${processedBooks.length} из ${books.length} книг`}
-          </div>
-        )}
+        {/* Add Book Button */}
+        <Button onClick={onBookAdd} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Add Book
+        </Button>
       </div>
 
       {/* Books Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-          {Array.from({ length: 12 }).map((_, index) => (
-            <BookCardSkeleton key={index} />
-          ))}
-        </div>
-      ) : processedBooks.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-          {processedBooks.map((book) => (
-            <BookCard
-              key={book.id}
-              book={book}
-              onRead={onBookRead}
-              onDetails={onBookDetails}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-16">
-          <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-            <Book className="w-10 h-10 text-muted-foreground" />
-          </div>
-          <h3 className="font-display text-lg font-semibold text-foreground mb-2">
-            {localSearchQuery ? 'Книги не найдены' : 'Ваша библиотека пуста'}
+      {filteredAndSortedBooks.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <BookOpen className="h-16 w-16 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">
+            {searchQuery ? 'No books found' : 'No books yet'}
           </h3>
-          <p className="text-muted-foreground max-w-md mx-auto mb-6">
-            {localSearchQuery
-              ? 'Попробуйте изменить поисковый запрос или проверьте правильность написания'
-              : 'Добавьте первую книгу в свою библиотеку, чтобы начать читать'}
+          <p className="text-muted-foreground mb-6 max-w-md">
+            {searchQuery
+              ? `No books match "${searchQuery}". Try adjusting your search terms.`
+              : 'Start building your library by adding your first book.'}
           </p>
-          {!localSearchQuery && onBookAdd && (
-            <Button
-              onClick={onBookAdd}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Добавить первую книгу
+          {!searchQuery && (
+            <Button onClick={onBookAdd} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Your First Book
             </Button>
           )}
         </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+          {filteredAndSortedBooks.map((book) => (
+            <Card
+              key={book.id}
+              className="group overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+            >
+              <CardContent className="p-0">
+                {/* Book Cover */}
+                <div className="relative aspect-[3/4] bg-muted overflow-hidden">
+                  {book.coverUrl && getImageLoadState(book.id) !== 'error' ? (
+                    <>
+                      {getImageLoadState(book.id) === 'loading' && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        </div>
+                      )}
+                      <img
+                        src={book.coverUrl}
+                        alt={book.title}
+                        className={`w-full h-full object-cover transition-opacity duration-300 ${
+                          getImageLoadState(book.id) === 'loaded' ? 'opacity-100' : 'opacity-0'
+                        }`}
+                        onLoad={() => handleImageLoad(book.id)}
+                        onError={() => handleImageError(book.id)}
+                        onLoadStart={() => handleImageLoadStart(book.id)}
+                      />
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-muted">
+                      <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                    </div>
+                  )}
+
+                  {/* Hover Actions */}
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => onBookRead(book)}
+                      className="bg-primary hover:bg-primary/90"
+                    >
+                      <BookOpen className="h-4 w-4 mr-1" />
+                      Read
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => onBookDetails(book)}
+                    >
+                      <Info className="h-4 w-4 mr-1" />
+                      Details
+                    </Button>
+                  </div>
+
+                  {/* Progress Indicator */}
+                  <div className="absolute top-3 right-3">
+                    <CircularProgress progress={book.progress} />
+                  </div>
+                </div>
+
+                {/* Book Info */}
+                <div className="p-4 space-y-3">
+                  <div>
+                    <h3 className="font-semibold text-foreground line-clamp-2 leading-tight">
+                      {book.title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      by {book.author}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs px-2 py-1 bg-secondary text-secondary-foreground rounded-full">
+                      {book.genre}
+                    </span>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-muted-foreground">Progress</span>
+                      <span className="text-xs font-medium text-foreground">{book.progress}%</span>
+                    </div>
+                    <Progress value={book.progress} className="h-2" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
     </div>
-  )
-}
+  );
+};
