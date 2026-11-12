@@ -1,10 +1,11 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface TTSSettings {
   rate: number
   pitch: number
   volume: number
-  voice?: SpeechSynthesisVoice
+  /** Selected voice name; null/empty means use the browser default. */
+  voice: string | null
 }
 
 export interface TTSCallbacks {
@@ -19,218 +20,297 @@ export interface TTSCallbacks {
 export interface TTSConfig {
   settings?: Partial<TTSSettings>
   callbacks?: TTSCallbacks
+  /** Backwards-compatible top-level callbacks used by the app page. */
+  onStart?: () => void
+  onEnd?: () => void
+  onError?: (error: Error) => void
+  onWordBoundary?: (charIndex: number, word: string) => void
+  defaultLanguage?: string
 }
 
-export type TTSState = 'idle' | 'speaking' | 'paused' | 'error'
+export interface TTSState {
+  speaking: boolean
+  paused: boolean
+  stopped: boolean
+  loading: boolean
+  error: string | null
+}
+
+export interface TTSProgress {
+  progress: number
+  currentWordIndex: number
+  currentWord: string
+  totalWords: number
+  elapsedTime: number
+}
+
+export interface LanguageVoice {
+  voice: SpeechSynthesisVoice
+  name: string
+  language: string
+}
 
 export interface UseTextToSpeechReturn {
   state: TTSState
   isSupported: boolean
   voices: SpeechSynthesisVoice[]
-  currentSettings: TTSSettings
+  settings: TTSSettings
+  progress: TTSProgress
   speak: (text: string, language?: string) => Promise<void>
   pause: () => void
   resume: () => void
   stop: () => void
-  updateSettings: (newSettings: Partial<TTSSettings>) => void
-  error: string | null
+  updateSettings: (settings: Partial<TTSSettings>) => void
+  getVoicesForLanguage: (language: string) => LanguageVoice[]
+  getVoicesByLanguage: (language: string) => SpeechSynthesisVoice[]
 }
 
 const DEFAULT_SETTINGS: TTSSettings = {
   rate: 1,
   pitch: 1,
-  volume: 1,
-  voice: undefined
+  volume: 0.8,
+  voice: null,
 }
 
+const INITIAL_STATE: TTSState = {
+  speaking: false,
+  paused: false,
+  stopped: true,
+  loading: false,
+  error: null,
+}
+
+const INITIAL_PROGRESS: TTSProgress = {
+  progress: 0,
+  currentWordIndex: 0,
+  currentWord: '',
+  totalWords: 0,
+  elapsedTime: 0,
+}
+
+/** A single SSR-safe Web Speech API hook used by the app and controls. */
 export const useTextToSpeech = (config: TTSConfig = {}): UseTextToSpeechReturn => {
-  const [state, setState] = useState<TTSState>('idle')
+  const [isSupported, setIsSupported] = useState(false)
+  const [state, setState] = useState<TTSState>(INITIAL_STATE)
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [currentSettings, setCurrentSettings] = useState<TTSSettings>({
+  const [settings, setSettings] = useState<TTSSettings>(() => ({
     ...DEFAULT_SETTINGS,
-    ...config.settings
-  })
+    ...config.settings,
+  }))
+  const [progress, setProgress] = useState<TTSProgress>(INITIAL_PROGRESS)
 
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
-  const callbacksRef = useRef<TTSCallbacks>(config.callbacks || {})
+  const startedAtRef = useRef<number>(0)
+  const elapsedBeforePauseRef = useRef<number>(0)
+  const wordsRef = useRef<string[]>([])
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const callbacksRef = useRef(config)
 
-  // Update callbacks ref when config changes
   useEffect(() => {
-    callbacksRef.current = config.callbacks || {}
-  }, [config.callbacks])
+    callbacksRef.current = config
+  }, [config])
 
-  // Check if SpeechSynthesis is supported
-  const isSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
+  const callbacks = useCallback(() => ({
+    ...callbacksRef.current.callbacks,
+    onStart: callbacksRef.current.callbacks?.onStart ?? callbacksRef.current.onStart,
+    onEnd: callbacksRef.current.callbacks?.onEnd ?? callbacksRef.current.onEnd,
+    onError: callbacksRef.current.callbacks?.onError ?? callbacksRef.current.onError,
+  }), [])
 
-  // Load available voices
-  const loadVoices = useCallback(() => {
-    if (!isSupported) return
-
-    const availableVoices = speechSynthesis.getVoices()
-    setVoices(availableVoices)
-
-    // Set default voice if none is selected
-    if (!currentSettings.voice && availableVoices.length > 0) {
-      const defaultVoice = availableVoices.find(voice => voice.default) || availableVoices[0]
-      setCurrentSettings(prev => ({ ...prev, voice: defaultVoice }))
-    }
-  }, [isSupported, currentSettings.voice])
-
-  // Initialize voices on mount and when voices change
   useEffect(() => {
-    if (!isSupported) return
+    const supported = typeof window !== 'undefined' && 'speechSynthesis' in window
+    setIsSupported(supported)
+    if (!supported) return
 
+    const loadVoices = () => setVoices(window.speechSynthesis.getVoices())
     loadVoices()
+    window.speechSynthesis.addEventListener('voiceschanged', loadVoices)
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', loadVoices)
+  }, [])
 
-    // Some browsers load voices asynchronously
-    const handleVoicesChanged = () => loadVoices()
-    speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged)
-
-    return () => {
-      speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged)
+  const stopProgressTimer = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
     }
-  }, [isSupported, loadVoices])
+  }, [])
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (isSupported && speechSynthesis.speaking) {
-        speechSynthesis.cancel()
-      }
-    }
-  }, [isSupported])
+  const getVoicesByLanguage = useCallback((language: string) => {
+    const prefix = language.split('-')[0].toLowerCase()
+    return voices.filter((voice) => voice.lang.toLowerCase().startsWith(prefix))
+  }, [voices])
 
-  const speak = useCallback(async (text: string, language?: string): Promise<void> => {
-    if (!isSupported) {
-      const error = new Error('Speech synthesis is not supported in this browser')
-      setError(error.message)
-      callbacksRef.current.onError?.(error)
-      setState('error')
-      return Promise.reject(error)
-    }
-
-    if (!text.trim()) {
-      const error = new Error('Text cannot be empty')
-      setError(error.message)
-      callbacksRef.current.onError?.(error)
-      setState('error')
-      return Promise.reject(error)
-    }
-
-    // Cancel any ongoing speech
-    if (speechSynthesis.speaking) {
-      speechSynthesis.cancel()
-    }
-
-    return new Promise((resolve, reject) => {
-      try {
-        const utterance = new SpeechSynthesisUtterance(text)
-        utteranceRef.current = utterance
-
-        // Apply settings
-        utterance.rate = currentSettings.rate
-        utterance.pitch = currentSettings.pitch
-        utterance.volume = currentSettings.volume
-        
-        if (currentSettings.voice) {
-          utterance.voice = currentSettings.voice
-        }
-
-        if (language) {
-          utterance.lang = language
-        }
-
-        // Set up event listeners
-        utterance.onstart = () => {
-          setState('speaking')
-          setError(null)
-          callbacksRef.current.onStart?.()
-        }
-
-        utterance.onend = () => {
-          setState('idle')
-          callbacksRef.current.onEnd?.()
-          resolve()
-        }
-
-        utterance.onerror = (event) => {
-          setState('error')
-          const errorMessage = `Speech synthesis error: ${event.error}`
-          setError(errorMessage)
-          callbacksRef.current.onError?.(event)
-          reject(new Error(errorMessage))
-        }
-
-        utterance.onpause = () => {
-          setState('paused')
-          callbacksRef.current.onPause?.()
-        }
-
-        utterance.onresume = () => {
-          setState('speaking')
-          callbacksRef.current.onResume?.()
-        }
-
-        utterance.onboundary = (event) => {
-          callbacksRef.current.onBoundary?.(event)
-        }
-
-        // Start speaking
-        speechSynthesis.speak(utterance)
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error('Unknown error occurred')
-        setState('error')
-        setError(error.message)
-        callbacksRef.current.onError?.(error)
-        reject(error)
-      }
-    })
-  }, [isSupported, currentSettings])
-
-  const pause = useCallback(() => {
-    if (!isSupported) return
-
-    if (speechSynthesis.speaking && !speechSynthesis.paused) {
-      speechSynthesis.pause()
-    }
-  }, [isSupported])
-
-  const resume = useCallback(() => {
-    if (!isSupported) return
-
-    if (speechSynthesis.paused) {
-      speechSynthesis.resume()
-    }
-  }, [isSupported])
-
-  const stop = useCallback(() => {
-    if (!isSupported) return
-
-    if (speechSynthesis.speaking) {
-      speechSynthesis.cancel()
-      setState('idle')
-      utteranceRef.current = null
-    }
-  }, [isSupported])
+  const getVoicesForLanguage = useCallback((language: string): LanguageVoice[] => (
+    getVoicesByLanguage(language).map((voice) => ({
+      voice,
+      name: voice.name,
+      language: voice.lang,
+    }))
+  ), [getVoicesByLanguage])
 
   const updateSettings = useCallback((newSettings: Partial<TTSSettings>) => {
-    setCurrentSettings(prev => ({
-      ...prev,
-      ...newSettings
-    }))
+    setSettings((current) => {
+      const updated = { ...current, ...newSettings }
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('voiceSettings', JSON.stringify(updated))
+        }
+      } catch {
+        // Storage can be disabled or unavailable; speech settings still work in memory.
+      }
+      return updated
+    })
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const saved = window.localStorage.getItem('voiceSettings')
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<TTSSettings>
+        setSettings((current) => ({ ...current, ...parsed, voice: parsed.voice ?? current.voice }))
+      }
+    } catch {
+      // Ignore malformed or unavailable persisted settings.
+    }
+  }, [])
+
+  const speak = useCallback(async (text: string, language = config.defaultLanguage ?? 'ru-RU') => {
+    const cleanText = text.replace(/\s+/g, ' ').trim()
+    if (!cleanText) return
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      const error = new Error('Синтез речи не поддерживается в этом браузере')
+      setState({ ...INITIAL_STATE, error: error.message })
+      callbacks().onError?.(error)
+      return
+    }
+
+    const synthesis = window.speechSynthesis
+    synthesis.cancel()
+    stopProgressTimer()
+
+    const utterance = new SpeechSynthesisUtterance(cleanText)
+    utteranceRef.current = utterance
+    const selectedVoice = voices.find((voice) => voice.name === settings.voice)
+      ?? voices.find((voice) => voice.lang.toLowerCase().startsWith(language.split('-')[0].toLowerCase()))
+    utterance.voice = selectedVoice ?? null
+    utterance.lang = language
+    utterance.rate = Math.max(0.1, Math.min(10, settings.rate))
+    utterance.pitch = Math.max(0, Math.min(2, settings.pitch))
+    utterance.volume = Math.max(0, Math.min(1, settings.volume))
+
+    wordsRef.current = cleanText.split(' ')
+    elapsedBeforePauseRef.current = 0
+    setProgress({ ...INITIAL_PROGRESS, totalWords: wordsRef.current.length, currentWord: wordsRef.current[0] ?? '' })
+    setState({ ...INITIAL_STATE, loading: true })
+
+    utterance.onstart = () => {
+      startedAtRef.current = Date.now()
+      setState({ speaking: true, paused: false, stopped: false, loading: false, error: null })
+      stopProgressTimer()
+      intervalRef.current = setInterval(() => {
+        const elapsed = elapsedBeforePauseRef.current + (Date.now() - startedAtRef.current)
+        setProgress((current) => ({ ...current, elapsedTime: Math.floor(elapsed / 1000) }))
+      }, 250)
+      callbacks().onStart?.()
+    }
+    utterance.onboundary = (event) => {
+      const words = wordsRef.current
+      let wordIndex = 0
+      let position = 0
+      while (wordIndex < words.length - 1 && position + words[wordIndex].length <= event.charIndex) {
+        position += words[wordIndex].length + 1
+        wordIndex += 1
+      }
+      const word = words[wordIndex] ?? ''
+      setProgress((current) => ({
+        ...current,
+        currentWordIndex: wordIndex,
+        currentWord: word,
+        progress: words.length ? Math.min(100, (wordIndex / words.length) * 100) : 0,
+      }))
+      callbacks().onWordBoundary?.(event.charIndex, word)
+      callbacks().callbacks?.onBoundary?.(event)
+    }
+    utterance.onpause = () => {
+      elapsedBeforePauseRef.current += Date.now() - startedAtRef.current
+      stopProgressTimer()
+      setState((current) => ({ ...current, speaking: false, paused: true }))
+      callbacks().callbacks?.onPause?.()
+    }
+    utterance.onresume = () => {
+      startedAtRef.current = Date.now()
+      setState((current) => ({ ...current, speaking: true, paused: false }))
+      stopProgressTimer()
+      intervalRef.current = setInterval(() => {
+        const elapsed = elapsedBeforePauseRef.current + (Date.now() - startedAtRef.current)
+        setProgress((current) => ({ ...current, elapsedTime: Math.floor(elapsed / 1000) }))
+      }, 250)
+      callbacks().callbacks?.onResume?.()
+    }
+    utterance.onend = () => {
+      stopProgressTimer()
+      setState({ ...INITIAL_STATE })
+      setProgress((current) => ({ ...current, progress: 100 }))
+      callbacks().onEnd?.()
+    }
+    utterance.onerror = (event) => {
+      stopProgressTimer()
+      const error = new Error(`Ошибка синтеза речи: ${event.error}`)
+      setState({ ...INITIAL_STATE, error: error.message })
+      callbacks().onError?.(event)
+    }
+
+    try {
+      synthesis.speak(utterance)
+    } catch (cause) {
+      stopProgressTimer()
+      const error = cause instanceof Error ? cause : new Error('Не удалось запустить синтез речи')
+      setState({ ...INITIAL_STATE, error: error.message })
+      callbacks().onError?.(error)
+    }
+  }, [callbacks, config.defaultLanguage, settings, stopProgressTimer, voices])
+
+  const pause = useCallback(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking) {
+      window.speechSynthesis.pause()
+    }
+  }, [])
+
+  const resume = useCallback(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.paused) {
+      window.speechSynthesis.resume()
+    }
+  }, [])
+
+  const stop = useCallback(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel()
+    stopProgressTimer()
+    utteranceRef.current = null
+    elapsedBeforePauseRef.current = 0
+    setState({ ...INITIAL_STATE })
+    setProgress(INITIAL_PROGRESS)
+  }, [stopProgressTimer])
+
+  useEffect(() => () => {
+    stopProgressTimer()
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel()
+  }, [stopProgressTimer])
 
   return {
     state,
     isSupported,
     voices,
-    currentSettings,
+    settings,
+    progress,
     speak,
     pause,
     resume,
     stop,
     updateSettings,
-    error
+    getVoicesForLanguage,
+    getVoicesByLanguage,
   }
 }
+
+export default useTextToSpeech
