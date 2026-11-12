@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Moon, Sun } from "lucide-react";
+import { BookOpen, Moon, Plus, Search, Sun } from "lucide-react";
 import SidebarNavigation from "@/components/app/sidebar-navigation";
 import { BookGrid } from "@/components/app/book-library-grid";
 import ReadingInterface from "@/components/app/reading-interface";
 import { AdvancedBookSearch } from "@/components/app/search-interface";
 import { BookCollectionManager } from "@/components/app/collections-manager";
 import { BookAddDialog } from "@/components/app/book-add-dialog";
+import MobileBottomNavigation from "@/components/app/mobile-bottom-nav";
 import { LanguageSwitcher } from "@/contexts/language-context";
+import libraryData from "@/data/library.json";
 
 interface BookData {
   id: string;
@@ -32,26 +34,43 @@ interface CollectionData {
   name: string;
   description?: string;
   books: Array<{ id: string; title: string; author: string; cover?: string; status?: "want-to-read" | "currently-reading" | "read" }>;
+  bookIds?: string[];
   isDefault?: boolean;
   createdAt: Date;
 }
 
-const initialBooks: BookData[] = [
-  { id: "1", title: "Война и мир", author: "Лев Толстой", genre: "Классическая литература", progress: 65, coverUrl: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=600&q=80", dateAdded: new Date("2025-01-12") },
-  { id: "2", title: "Преступление и наказание", author: "Федор Достоевский", genre: "Психологическая проза", progress: 100, coverUrl: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=600&q=80", dateAdded: new Date("2025-02-08") },
-  { id: "3", title: "Мастер и Маргарита", author: "Михаил Булгаков", genre: "Фантастика", progress: 30, coverUrl: "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=600&q=80", dateAdded: new Date("2025-03-19") },
-  { id: "4", title: "Анна Каренина", author: "Лев Толстой", genre: "Классическая литература", progress: 0, coverUrl: "https://images.unsplash.com/photo-1519682337058-a94d519337bc?auto=format&fit=crop&w=600&q=80", dateAdded: new Date("2025-04-04") },
-  { id: "5", title: "Идиот", author: "Федор Достоевский", genre: "Психологическая проза", progress: 45, coverUrl: "https://images.unsplash.com/photo-1513001900722-370f803f498d?auto=format&fit=crop&w=600&q=80", dateAdded: new Date("2025-05-21") },
-  { id: "6", title: "Евгений Онегин", author: "Александр Пушкин", genre: "Поэзия", progress: 80, coverUrl: "https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=600&q=80", dateAdded: new Date("2025-06-02") },
-];
+const initialBooks: BookData[] = libraryData.books.map((book) => ({
+  ...book,
+  dateAdded: new Date(book.dateAdded),
+}));
+
+const initialCollections: CollectionData[] = libraryData.collections.map((collection) => ({
+  id: collection.id,
+  name: collection.name,
+  description: collection.description,
+  isDefault: collection.isDefault,
+  createdAt: new Date(),
+  bookIds: collection.bookIds,
+  books: (collection.bookIds ?? []).flatMap((bookId) => {
+    const book = libraryData.books.find((item) => item.id === bookId);
+    if (!book) return [];
+    return [{
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      cover: book.coverUrl,
+      status: collection.id === "currently-reading" ? "currently-reading" : collection.id === "read" ? "read" : "want-to-read",
+    }];
+  }),
+}));
 
 const readingSettings = { fontSize: 18, fontFamily: "georgia", theme: "light", lineHeight: 1.6, margin: 32 };
 
 export default function HomePage() {
   const [activeSection, setActiveSection] = useState("library");
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [books, setBooks] = useState(initialBooks);
-  const [collections, setCollections] = useState<CollectionData[]>([]);
+  const [books, setBooks] = useState<BookData[]>(initialBooks);
+  const [collections, setCollections] = useState<CollectionData[]>(initialCollections);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"dateAdded" | "title" | "author" | "progress">("dateAdded");
   const [currentBook, setCurrentBook] = useState<BookData | null>(null);
@@ -60,12 +79,11 @@ export default function HomePage() {
 
   useEffect(() => {
     try {
-      const savedTheme = window.localStorage.getItem("theme");
-      const dark = savedTheme === "dark";
+      const dark = window.localStorage.getItem("theme") === "dark";
       setIsDarkMode(dark);
       document.documentElement.classList.toggle("dark", dark);
     } catch {
-      // The app remains usable when browser storage is unavailable.
+      // Browser storage is optional.
     }
   }, []);
 
@@ -76,8 +94,13 @@ export default function HomePage() {
     try {
       window.localStorage.setItem("theme", next ? "dark" : "light");
     } catch {
-      // Theme selection still applies for the current session.
+      // The theme remains active for the current session.
     }
+  };
+
+  const changeSection = (section: string) => {
+    setCurrentBook(null);
+    setActiveSection(section);
   };
 
   const handleBookRead = (bookOrId: { id: string } | string) => {
@@ -110,7 +133,7 @@ export default function HomePage() {
   }, [activeSection, books]);
 
   const pageTitle = activeSection === "reading" ? "Читаю сейчас" : activeSection === "favorites" ? "Избранное" : "Моя библиотека";
-  const pageDescription = activeSection === "reading" ? "Продолжите чтение с того места, где остановились" : activeSection === "favorites" ? "Книги, к которым хочется возвращаться" : "Все ваши книги в одном месте";
+  const pageDescription = activeSection === "reading" ? "Продолжите чтение с того места, где остановились" : activeSection === "favorites" ? "Книги, к которым хочется возвращаться" : "Ваша личная коллекция историй и идей";
 
   const renderContent = () => {
     if (currentBook) {
@@ -131,19 +154,19 @@ export default function HomePage() {
 
     if (activeSection === "settings") {
       return (
-        <main className="min-w-0 flex-1 overflow-y-auto p-6 md:p-10">
+        <main className="min-w-0 flex-1 overflow-y-auto p-5 pb-24 md:p-10 md:pb-10">
           <div className="mx-auto max-w-3xl">
             <h1 className="mb-2 text-3xl font-bold">Настройки</h1>
             <p className="mb-8 text-muted-foreground">Настройте приложение под себя.</p>
-            <section className="mb-5 rounded-xl border bg-card p-6">
+            <section className="mb-5 rounded-2xl border bg-card p-6 shadow-sm">
               <h2 className="mb-2 text-lg font-semibold">Внешний вид</h2>
               <p className="mb-4 text-sm text-muted-foreground">Выберите удобную тему оформления.</p>
-              <button onClick={handleThemeToggle} className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-muted" type="button">
+              <button onClick={handleThemeToggle} className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm hover:bg-muted" type="button">
                 {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 {isDarkMode ? "Включить светлую тему" : "Включить тёмную тему"}
               </button>
             </section>
-            <section className="rounded-xl border bg-card p-6">
+            <section className="rounded-2xl border bg-card p-6 shadow-sm">
               <h2 className="mb-2 text-lg font-semibold">Язык</h2>
               <p className="mb-4 text-sm text-muted-foreground">Выберите язык интерфейса.</p>
               <LanguageSwitcher />
@@ -154,12 +177,21 @@ export default function HomePage() {
     }
 
     if (activeSection === "collections") {
-      return <main className="min-w-0 flex-1 overflow-y-auto"><BookCollectionManager onCollectionCreate={(collection) => setCollections((previous) => [...previous, collection])} onCollectionSelect={() => setActiveSection("library")} onBookAdd={() => setIsBookAddDialogOpen(true)} /></main>;
+      return (
+        <main className="min-w-0 flex-1 overflow-y-auto pb-24 md:pb-0">
+          <BookCollectionManager
+            initialCollections={collections}
+            onCollectionCreate={(collection) => setCollections((previous) => [...previous, collection])}
+            onCollectionSelect={() => setActiveSection("library")}
+            onBookAdd={() => setIsBookAddDialogOpen(true)}
+          />
+        </main>
+      );
     }
 
     if (activeSection === "search") {
       return (
-        <main className="min-w-0 flex-1 overflow-y-auto">
+        <main className="min-w-0 flex-1 overflow-y-auto pb-24 md:pb-0">
           <AdvancedBookSearch
             books={books.map((book) => ({
               id: book.id,
@@ -180,18 +212,50 @@ export default function HomePage() {
     }
 
     return (
-      <main className="min-w-0 flex-1 overflow-y-auto p-6 md:p-10">
+      <main className="min-w-0 flex-1 overflow-y-auto p-4 pb-24 sm:p-6 md:p-10 md:pb-10">
         <div className="mx-auto max-w-7xl">
-          <div className="mb-8 flex items-start justify-between gap-4">
+          <section className="relative mb-8 overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-slate-950 via-indigo-950 to-violet-900 px-6 py-8 text-white shadow-xl sm:px-9 sm:py-10">
+            <div className="absolute -right-10 -top-20 h-64 w-64 rounded-full bg-violet-400/20 blur-3xl" />
+            <div className="absolute bottom-0 right-1/4 h-32 w-32 rounded-full bg-amber-300/10 blur-2xl" />
+            <div className="relative z-10 max-w-2xl">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-violet-100 backdrop-blur">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" /> ВАШЕ ТИХОЕ МЕСТО ДЛЯ ЧТЕНИЯ
+              </div>
+              <h1 className="mb-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{pageTitle}</h1>
+              <p className="max-w-lg text-sm leading-6 text-slate-200 sm:text-base">{pageDescription}. Возвращайтесь к любимым книгам в своём ритме.</p>
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextBook = books.find((book) => book.progress > 0 && book.progress < 100) ?? books[0];
+                    if (nextBook) handleBookRead(nextBook.id);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-lg transition hover:-translate-y-0.5 hover:bg-violet-50"
+                >
+                  <BookOpen className="h-4 w-4" /> Продолжить чтение
+                </button>
+                <button onClick={() => setIsBookAddDialogOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium text-white backdrop-blur transition hover:bg-white/15" type="button">
+                  <Plus className="h-4 w-4" /> Добавить книгу
+                </button>
+              </div>
+            </div>
+            <div className="relative z-10 mt-7 grid grid-cols-3 gap-2 border-t border-white/15 pt-5 sm:absolute sm:bottom-8 sm:right-8 sm:mt-0 sm:w-[340px] sm:border-0 sm:pt-0">
+              <div className="rounded-xl bg-white/10 p-3 backdrop-blur"><p className="text-xl font-semibold text-white">{books.length}</p><p className="text-[11px] text-slate-300">книг в библиотеке</p></div>
+              <div className="rounded-xl bg-white/10 p-3 backdrop-blur"><p className="text-xl font-semibold text-white">{books.filter((book) => book.progress > 0 && book.progress < 100).length}</p><p className="text-[11px] text-slate-300">читаю сейчас</p></div>
+              <div className="rounded-xl bg-white/10 p-3 backdrop-blur"><p className="text-xl font-semibold text-white">{books.filter((book) => book.progress === 100).length}</p><p className="text-[11px] text-slate-300">прочитано</p></div>
+            </div>
+          </section>
+
+          <div className="mb-5 flex items-end justify-between gap-3">
             <div>
-              <h1 className="mb-2 text-3xl font-bold">{pageTitle}</h1>
-              <p className="text-muted-foreground">{pageDescription}</p>
+              <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">Ваша полка</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Выберите книгу, чтобы вернуться к чтению</p>
             </div>
-            <div className="hidden items-center gap-2 rounded-xl border bg-card px-4 py-3 sm:flex">
-              <BookOpen className="h-5 w-5 text-primary" />
-              <span className="text-sm font-medium">{books.length} книг</span>
-            </div>
+            <button onClick={() => changeSection("search")} className="hidden items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground transition hover:text-foreground sm:inline-flex" type="button">
+              <Search className="h-4 w-4" /> Найти книгу
+            </button>
           </div>
+
           <BookGrid
             books={visibleBooks.map((book) => ({ ...book, dateAdded: book.dateAdded.toISOString() }))}
             onBookRead={handleBookRead}
@@ -209,18 +273,38 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="flex h-screen overflow-hidden">
-        <div className="hidden h-full shrink-0 md:block">
-          <SidebarNavigation
-            activeSection={activeSection}
-            onSectionChange={(section) => { setCurrentBook(null); setActiveSection(section); }}
-            isDarkMode={isDarkMode}
-            onThemeToggle={handleThemeToggle}
-            onBookAdd={() => setIsBookAddDialogOpen(true)}
-          />
-        </div>
+      <div className="flex h-[100dvh] overflow-hidden">
+        {!currentBook && (
+          <div className="hidden h-full shrink-0 md:block">
+            <SidebarNavigation
+              activeSection={activeSection}
+              onSectionChange={changeSection}
+              isDarkMode={isDarkMode}
+              onThemeToggle={handleThemeToggle}
+              onBookAdd={() => setIsBookAddDialogOpen(true)}
+            />
+          </div>
+        )}
+
+        {!currentBook && (
+          <header className="fixed left-0 right-0 top-0 z-30 flex h-14 items-center justify-between border-b bg-background/85 px-4 backdrop-blur-xl md:hidden">
+            <div className="flex items-center gap-2 font-semibold">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                <BookOpen className="h-4 w-4" />
+              </span>
+              My Book
+            </div>
+            <button onClick={() => setIsBookAddDialogOpen(true)} className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground" aria-label="Добавить книгу" type="button">
+              <Plus className="h-4 w-4" />
+            </button>
+          </header>
+        )}
+
         {renderContent()}
+
+        {!currentBook && <MobileBottomNavigation activeSection={activeSection} onSectionChange={changeSection} />}
       </div>
+
       <BookAddDialog
         isOpen={isBookAddDialogOpen}
         onClose={() => setIsBookAddDialogOpen(false)}
