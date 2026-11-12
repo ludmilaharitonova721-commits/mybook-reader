@@ -1,222 +1,232 @@
 "use client";
 
-import React, { useEffect, useState } from 'react'
-import SidebarNavigation from '@/components/app/sidebar-navigation'
-import { BookGrid } from '@/components/app/book-library-grid'
-import ReadingInterface from '@/components/app/reading-interface'
-import { AdvancedBookSearch } from '@/components/app/search-interface'
-import { BookCollectionManager } from '@/components/app/collections-manager'
-import { BookAddDialog } from '@/components/app/book-add-dialog'
-import { useTextToSpeech } from '@/hooks/use-text-to-speech'
+import { useEffect, useMemo, useState } from "react";
+import { BookOpen, Moon, Sun } from "lucide-react";
+import SidebarNavigation from "@/components/app/sidebar-navigation";
+import { BookGrid } from "@/components/app/book-library-grid";
+import ReadingInterface from "@/components/app/reading-interface";
+import { AdvancedBookSearch } from "@/components/app/search-interface";
+import { BookCollectionManager } from "@/components/app/collections-manager";
+import { BookAddDialog } from "@/components/app/book-add-dialog";
+import { LanguageSwitcher } from "@/contexts/language-context";
 
 interface BookData {
-  id: string
-  title: string
-  author: string
-  genre: string
-  progress: number
-  coverUrl?: string
-  dateAdded: Date
+  id: string;
+  title: string;
+  author: string;
+  genre: string;
+  progress: number;
+  coverUrl?: string;
+  dateAdded: Date;
 }
 
 interface AddedBookData {
-  title: string
-  author: string
-  genre?: string
-  coverImage?: File
+  title: string;
+  author: string;
+  genre?: string;
+  coverImage?: File;
 }
 
 interface CollectionData {
-  id: string
-  name: string
-  description?: string
-  books: Array<{ id: string; title: string; author: string; cover?: string; status?: 'want-to-read' | 'currently-reading' | 'read' }>
-  isDefault?: boolean
-  createdAt: Date
+  id: string;
+  name: string;
+  description?: string;
+  books: Array<{ id: string; title: string; author: string; cover?: string; status?: "want-to-read" | "currently-reading" | "read" }>;
+  isDefault?: boolean;
+  createdAt: Date;
 }
 
-const mockBooks: BookData[] = [
-  { id: '1', title: 'Война и мир', author: 'Лев Толстой', genre: 'Классическая литература', progress: 65, coverUrl: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=200&h=300&fit=crop&crop=entropy&auto=format', dateAdded: new Date('2024-01-15') },
-  { id: '2', title: 'Преступление и наказание', author: 'Федор Достоевский', genre: 'Психологическая проза', progress: 100, coverUrl: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=200&h=300&fit=crop&crop=entropy&auto=format', dateAdded: new Date('2024-01-10') },
-  { id: '3', title: 'Мастер и Маргарита', author: 'Михаил Булгаков', genre: 'Фантастика', progress: 30, coverUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=300&fit=crop&crop=entropy&auto=format', dateAdded: new Date('2024-01-20') },
-  { id: '4', title: 'Анна Каренина', author: 'Лев Толстой', genre: 'Классическая литература', progress: 0, coverUrl: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=200&h=300&fit=crop&crop=entropy&auto=format', dateAdded: new Date('2024-01-25') },
-  { id: '5', title: 'Идиот', author: 'Федор Достоевский', genre: 'Психологическая проза', progress: 45, coverUrl: 'https://images.unsplash.com/photo-1592496431122-2349e0fbc666?w=200&h=300&fit=crop&crop=entropy&auto=format', dateAdded: new Date('2024-02-01') },
-  { id: '6', title: 'Евгений Онегин', author: 'Александр Пушкин', genre: 'Поэзия', progress: 80, coverUrl: 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=200&h=300&fit=crop&crop=entropy&auto=format', dateAdded: new Date('2024-02-05') }
-]
+const initialBooks: BookData[] = [
+  { id: "1", title: "Война и мир", author: "Лев Толстой", genre: "Классическая литература", progress: 65, coverUrl: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=600&q=80", dateAdded: new Date("2025-01-12") },
+  { id: "2", title: "Преступление и наказание", author: "Федор Достоевский", genre: "Психологическая проза", progress: 100, coverUrl: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=600&q=80", dateAdded: new Date("2025-02-08") },
+  { id: "3", title: "Мастер и Маргарита", author: "Михаил Булгаков", genre: "Фантастика", progress: 30, coverUrl: "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=600&q=80", dateAdded: new Date("2025-03-19") },
+  { id: "4", title: "Анна Каренина", author: "Лев Толстой", genre: "Классическая литература", progress: 0, coverUrl: "https://images.unsplash.com/photo-1519682337058-a94d519337bc?auto=format&fit=crop&w=600&q=80", dateAdded: new Date("2025-04-04") },
+  { id: "5", title: "Идиот", author: "Федор Достоевский", genre: "Психологическая проза", progress: 45, coverUrl: "https://images.unsplash.com/photo-1513001900722-370f803f498d?auto=format&fit=crop&w=600&q=80", dateAdded: new Date("2025-05-21") },
+  { id: "6", title: "Евгений Онегин", author: "Александр Пушкин", genre: "Поэзия", progress: 80, coverUrl: "https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=600&q=80", dateAdded: new Date("2025-06-02") },
+];
+
+const readingSettings = { fontSize: 18, fontFamily: "georgia", theme: "light", lineHeight: 1.6, margin: 32 };
 
 export default function HomePage() {
-  const [activeSection, setActiveSection] = useState('library')
-  const [isDarkMode, setIsDarkMode] = useState(false)
-  const [books, setBooks] = useState<BookData[]>(mockBooks)
-  const [collections, setCollections] = useState<CollectionData[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState<'dateAdded' | 'title' | 'author' | 'progress'>('dateAdded')
-  const [isReading, setIsReading] = useState(false)
-  const [currentBook, setCurrentBook] = useState<BookData | null>(null)
-  const [isBookAddDialogOpen, setIsBookAddDialogOpen] = useState(false)
-  const [readingSettings, setReadingSettings] = useState({ fontSize: 18, fontFamily: 'georgia', theme: 'light', lineHeight: 1.6, margin: 32 })
-  const [voiceSettings, setVoiceSettings] = useState({ enabled: false, language: 'ru-RU', voice: 'default', speed: 1, pitch: 1, volume: 0.8 })
-
-  const tts = useTextToSpeech({
-    defaultLanguage: voiceSettings.language,
-    onError: (error) => console.error('TTS Error:', error),
-    onStart: () => console.log('TTS Started'),
-    onEnd: () => console.log('TTS Ended'),
-  })
-
-  const availableCollections = [
-    { id: 'main', name: 'Основная библиотека' },
-    { id: 'russian-classics', name: 'Русская классика' },
-    { id: 'sci-fi', name: 'Научная фантастика' },
-    { id: 'detectives', name: 'Детективы' },
-    { id: 'biographies', name: 'Биографии' },
-    { id: 'textbooks', name: 'Учебная литература' },
-  ]
+  const [activeSection, setActiveSection] = useState("library");
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [books, setBooks] = useState(initialBooks);
+  const [collections, setCollections] = useState<CollectionData[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"dateAdded" | "title" | "author" | "progress">("dateAdded");
+  const [currentBook, setCurrentBook] = useState<BookData | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isBookAddDialogOpen, setIsBookAddDialogOpen] = useState(false);
 
   useEffect(() => {
     try {
-      const savedTheme = window.localStorage.getItem('theme')
-      if (savedTheme === 'dark') {
-        setIsDarkMode(true)
-        document.documentElement.classList.add('dark')
-      }
-      const savedVoiceSettings = window.localStorage.getItem('voiceSettings')
-      if (savedVoiceSettings) setVoiceSettings((current) => ({ ...current, ...JSON.parse(savedVoiceSettings) }))
-    } catch (error) {
-      console.error('Unable to load saved preferences:', error)
+      const savedTheme = window.localStorage.getItem("theme");
+      const dark = savedTheme === "dark";
+      setIsDarkMode(dark);
+      document.documentElement.classList.toggle("dark", dark);
+    } catch {
+      // The app remains usable when browser storage is unavailable.
     }
-  }, [])
+  }, []);
 
   const handleThemeToggle = () => {
-    const nextIsDark = !isDarkMode
-    setIsDarkMode(nextIsDark)
-    document.documentElement.classList.toggle('dark', nextIsDark)
-    try { window.localStorage.setItem('theme', nextIsDark ? 'dark' : 'light') } catch { /* Storage is optional. */ }
-  }
-
-  const handleVoiceSettingsChange = (newSettings: Partial<typeof voiceSettings>) => {
-    const updatedSettings = { ...voiceSettings, ...newSettings }
-    setVoiceSettings(updatedSettings)
-    try { window.localStorage.setItem('voiceSettings', JSON.stringify(updatedSettings)) } catch { /* Storage is optional. */ }
-    tts.updateSettings({ rate: updatedSettings.speed, pitch: updatedSettings.pitch, volume: updatedSettings.volume, voice: updatedSettings.voice === 'default' ? null : updatedSettings.voice })
-  }
-
-  const handleTestVoice = () => {
-    const text = voiceSettings.language === 'en-US'
-      ? 'Hello! This is a voice test for reading books aloud.'
-      : 'Привет! Это тест голоса для озвучивания книг.'
-    void tts.speak(text, voiceSettings.language)
-  }
-
-  const handleSectionChange = (section: string) => {
-    setActiveSection(section)
-    setIsReading(false)
-  }
+    const next = !isDarkMode;
+    setIsDarkMode(next);
+    document.documentElement.classList.toggle("dark", next);
+    try {
+      window.localStorage.setItem("theme", next ? "dark" : "light");
+    } catch {
+      // Theme selection still applies for the current session.
+    }
+  };
 
   const handleBookRead = (bookOrId: { id: string } | string) => {
-    const id = typeof bookOrId === 'string' ? bookOrId : bookOrId.id
-    const book = books.find((item) => item.id === id)
-    if (book) {
-      setCurrentBook(book)
-      setIsReading(true)
-    }
-  }
+    const id = typeof bookOrId === "string" ? bookOrId : bookOrId.id;
+    const book = books.find((item) => item.id === id);
+    if (!book) return;
+    setCurrentBook(book);
+    setCurrentPage(Math.max(1, Math.floor((book.progress / 100) * 245) + 1));
+  };
 
-  const handleBookDetails = (book: { id: string } | string) => {
-    console.info('Book details:', typeof book === 'string' ? book : book.id)
-  }
-
-  const handleBookAdded = async (bookData: AddedBookData) => {
-    const newBook: BookData = {
-      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Date.now().toString(),
-      title: bookData.title,
-      author: bookData.author,
-      genre: bookData.genre || 'Без жанра',
+  const handleBookAdded = async (data: AddedBookData) => {
+    const book: BookData = {
+      id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()),
+      title: data.title,
+      author: data.author,
+      genre: data.genre || "Без жанра",
       progress: 0,
-      coverUrl: bookData.coverImage ? URL.createObjectURL(bookData.coverImage) : undefined,
+      coverUrl: data.coverImage ? URL.createObjectURL(data.coverImage) : undefined,
       dateAdded: new Date(),
+    };
+    setBooks((previous) => [book, ...previous]);
+    setActiveSection("library");
+    setIsBookAddDialogOpen(false);
+  };
+
+  const visibleBooks = useMemo(() => {
+    if (activeSection === "reading") return books.filter((book) => book.progress > 0 && book.progress < 100);
+    if (activeSection === "favorites") return books.filter((book) => book.progress > 50);
+    return books;
+  }, [activeSection, books]);
+
+  const pageTitle = activeSection === "reading" ? "Читаю сейчас" : activeSection === "favorites" ? "Избранное" : "Моя библиотека";
+  const pageDescription = activeSection === "reading" ? "Продолжите чтение с того места, где остановились" : activeSection === "favorites" ? "Книги, к которым хочется возвращаться" : "Все ваши книги в одном месте";
+
+  const renderContent = () => {
+    if (currentBook) {
+      return (
+        <ReadingInterface
+          bookTitle={currentBook.title}
+          currentPage={currentPage}
+          totalPages={245}
+          initialSettings={readingSettings}
+          onBack={() => setCurrentBook(null)}
+          onPageChange={(page) => {
+            setCurrentPage(page);
+            setBooks((previous) => previous.map((book) => book.id === currentBook.id ? { ...book, progress: Math.min(100, Math.round((page / 245) * 100)) } : book));
+          }}
+        />
+      );
     }
-    setBooks((previous) => [newBook, ...previous])
-    setActiveSection('library')
-  }
 
-  const handleCollectionCreate = (collection: CollectionData) => {
-    setCollections((previous) => [...previous, collection])
-  }
-
-  const handleCollectionSelect = (collectionId: string) => {
-    console.info('Selected collection:', collectionId)
-  }
-
-  const filteredBooks = books.filter((book) => {
-    if (activeSection === 'reading') return book.progress > 0 && book.progress < 100
-    if (activeSection === 'favorites') return book.progress > 50
-    return true
-  })
-
-  const renderMainContent = () => {
-    if (isReading && currentBook) {
-      return <ReadingInterface bookTitle={currentBook.title} currentPage={Math.floor((currentBook.progress / 100) * 245) + 1} totalPages={245} onBack={() => { setIsReading(false); setCurrentBook(null) }} onPageChange={(page) => console.info('Page changed:', page)} onSettingsChange={setReadingSettings} initialSettings={readingSettings} />
+    if (activeSection === "settings") {
+      return (
+        <main className="min-w-0 flex-1 overflow-y-auto p-6 md:p-10">
+          <div className="mx-auto max-w-3xl">
+            <h1 className="mb-2 text-3xl font-bold">Настройки</h1>
+            <p className="mb-8 text-muted-foreground">Настройте приложение под себя.</p>
+            <section className="mb-5 rounded-xl border bg-card p-6">
+              <h2 className="mb-2 text-lg font-semibold">Внешний вид</h2>
+              <p className="mb-4 text-sm text-muted-foreground">Выберите удобную тему оформления.</p>
+              <button onClick={handleThemeToggle} className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-muted" type="button">
+                {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                {isDarkMode ? "Включить светлую тему" : "Включить тёмную тему"}
+              </button>
+            </section>
+            <section className="rounded-xl border bg-card p-6">
+              <h2 className="mb-2 text-lg font-semibold">Язык</h2>
+              <p className="mb-4 text-sm text-muted-foreground">Выберите язык интерфейса.</p>
+              <LanguageSwitcher />
+            </section>
+          </div>
+        </main>
+      );
     }
 
-    switch (activeSection) {
-      case 'library':
-      case 'reading':
-      case 'favorites':
-        return (
-          <div className="flex-1 p-8">
-            <div className="mb-8">
-              <h1 className="text-3xl font-display font-bold text-foreground mb-2">{activeSection === 'library' ? 'Моя библиотека' : activeSection === 'reading' ? 'Читаю сейчас' : 'Избранное'}</h1>
-              <p className="text-muted-foreground">{activeSection === 'library' ? 'Все ваши книги в одном месте' : activeSection === 'reading' ? 'Продолжите чтение начатых книг' : 'Ваши любимые произведения'}</p>
+    if (activeSection === "collections") {
+      return <main className="min-w-0 flex-1 overflow-y-auto"><BookCollectionManager onCollectionCreate={(collection) => setCollections((previous) => [...previous, collection])} onCollectionSelect={() => setActiveSection("library")} onBookAdd={() => setIsBookAddDialogOpen(true)} /></main>;
+    }
+
+    if (activeSection === "search") {
+      return (
+        <main className="min-w-0 flex-1 overflow-y-auto">
+          <AdvancedBookSearch
+            books={books.map((book) => ({
+              id: book.id,
+              title: book.title,
+              author: book.author,
+              genre: book.genre,
+              description: `Произведение ${book.author} из жанра «${book.genre}»`,
+              cover: book.coverUrl || "",
+              format: "ebook" as const,
+              status: book.progress === 100 ? "completed" as const : book.progress > 0 ? "reading" as const : "unread" as const,
+              rating: 5,
+              progress: book.progress,
+            }))}
+            onBookClick={(book) => handleBookRead(book.id)}
+          />
+        </main>
+      );
+    }
+
+    return (
+      <main className="min-w-0 flex-1 overflow-y-auto p-6 md:p-10">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="mb-2 text-3xl font-bold">{pageTitle}</h1>
+              <p className="text-muted-foreground">{pageDescription}</p>
             </div>
-            <BookGrid
-              books={filteredBooks.map((book) => ({ ...book, dateAdded: book.dateAdded.toISOString() }))}
-              onBookRead={handleBookRead}
-              onBookDetails={handleBookDetails}
-              onBookAdd={() => setIsBookAddDialogOpen(true)}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              sortBy={sortBy}
-              onSortChange={setSortBy}
-            />
+            <div className="hidden items-center gap-2 rounded-xl border bg-card px-4 py-3 sm:flex">
+              <BookOpen className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium">{books.length} книг</span>
+            </div>
           </div>
-        )
-      case 'collections':
-        return <div className="flex-1"><BookCollectionManager onCollectionCreate={handleCollectionCreate} onCollectionSelect={handleCollectionSelect} onBookAdd={() => setIsBookAddDialogOpen(true)} /></div>
-      case 'search':
-        return (
-          <div className="flex-1">
-            <AdvancedBookSearch
-              books={books.map((book) => ({
-                id: book.id,
-                title: book.title,
-                author: book.author,
-                genre: book.genre,
-                description: `Произведение ${book.author} из жанра "${book.genre}"`,
-                cover: book.coverUrl || '',
-                format: 'ebook' as const,
-                status: book.progress === 100 ? 'completed' as const : book.progress > 0 ? 'reading' as const : 'unread' as const,
-                rating: 5,
-                progress: book.progress,
-              }))}
-              onBookClick={(book) => handleBookRead(book.id)}
-            />
-          </div>
-        )
-      default:
-        return null
-    }
-  }
+          <BookGrid
+            books={visibleBooks.map((book) => ({ ...book, dateAdded: book.dateAdded.toISOString() }))}
+            onBookRead={handleBookRead}
+            onBookDetails={handleBookRead}
+            onBookAdd={() => setIsBookAddDialogOpen(true)}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+          />
+        </div>
+      </main>
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="flex h-screen">
-        <SidebarNavigation activeSection={activeSection} onSectionChange={handleSectionChange} isDarkMode={isDarkMode} onThemeToggle={handleThemeToggle} onBookAdd={() => setIsBookAddDialogOpen(true)} />
-        {renderMainContent()}
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="flex h-screen overflow-hidden">
+        <div className="hidden h-full shrink-0 md:block">
+          <SidebarNavigation
+            activeSection={activeSection}
+            onSectionChange={(section) => { setCurrentBook(null); setActiveSection(section); }}
+            isDarkMode={isDarkMode}
+            onThemeToggle={handleThemeToggle}
+            onBookAdd={() => setIsBookAddDialogOpen(true)}
+          />
+        </div>
+        {renderContent()}
       </div>
-      <BookAddDialog isOpen={isBookAddDialogOpen} onClose={() => setIsBookAddDialogOpen(false)} onBookAdded={handleBookAdded} collections={availableCollections} />
-      {/* Settings actions are retained for the settings screen when it is implemented. */}
-      <span className="sr-only" aria-hidden="true">{voiceSettings.enabled ? 'TTS enabled' : 'TTS disabled'} {handleVoiceSettingsChange ? '' : ''} {handleTestVoice ? '' : ''}</span>
+      <BookAddDialog
+        isOpen={isBookAddDialogOpen}
+        onClose={() => setIsBookAddDialogOpen(false)}
+        onBookAdded={handleBookAdded}
+        collections={[{ id: "main", name: "Основная библиотека" }, ...collections.map(({ id, name }) => ({ id, name }))]}
+      />
     </div>
-  )
+  );
 }
