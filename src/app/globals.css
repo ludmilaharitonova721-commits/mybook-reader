@@ -1,3 +1,5 @@
+@import "./premium.css";
+
 @media (max-width: 767px) {
   .reader-mobile-safe {
     padding-top: max(env(safe-area-inset-top), 0.25rem);
@@ -6,7 +8,7 @@
 
   body:has(.reader-mobile-safe) .fixed.bottom-6.right-6 {
     right: 0.75rem;
-    bottom: calc(env(safe-area-inset-bottom) + 5.25rem);
+    bottom: calc(env(safe-area-inset-bottom) + 1rem);
   }
 
   body:has(.reader-mobile-safe) .fixed.right-0.top-0.h-full.w-80 {
